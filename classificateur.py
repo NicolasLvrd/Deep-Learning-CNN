@@ -14,8 +14,8 @@ docCount = 20;
 
 #> hyperparamètres
 learning_rate = 1e-3
-batch_size = 32
-epochs = 20
+batch_size = 512
+epochs = 10
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -191,20 +191,31 @@ class Net(nn.Module):
     def __init__(self):
         super().__init__()
         # 256 x 33 x 33
-        self.conv1 = nn.Conv2d(1, 10, 17) # 10 x (33-6+1) x 28
-        self.pool = nn.MaxPool2d(2) # 10 x 7 x 7
-        self.conv2 = nn.Conv2d(10, 20, 3) # 20 x (7-6+1) x 2
-        self.fc1 = nn.Linear(20*3*3, 23)
-        self.fc2 = nn.Linear(23, 46)
-        self.fc3 = nn.Linear(46, 30)
+        self.conv1 = nn.Conv2d(1, 20, 18, stride=1, padding=0, dilation=1) # 1 x 18 x 18
+        self.pool = nn.MaxPool2d(2) # 10 x 9 x 9
+        self.conv2 = nn.Conv2d(20, 40, 4, stride=1, padding=0, dilation=1) # 20 x 4 x 4
+        self.fc1 = nn.Linear(160, 80)
+        self.fc2 = nn.Linear(80, 30)
+        self.fc3 = nn.Linear(30, 10)
 
     def forward(self, x):
+        #print("start :", x.shape)
         x = self.pool(F.relu(self.conv1(x)))
+        '''
+        x=self.conv1(x)
+        print("after conv1 :", x.shape)
+        x = self.pool(F.relu(x))
+        print("after pool :", x.shape)
+        '''
         x = self.pool(F.relu(self.conv2(x)))
+        #print("after conv2 :", x.shape)
         x = torch.flatten(x, 1) # flatten all dimensions except batch
+        #print("after flatten :", x.shape)
         x = F.relu(self.fc1(x))
-        #x = F.relu(self.fc2(x))
-        #x = self.fc3(x)
+        #print("after fc1 :", x.shape)
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        #print("end")
         return x
 
 model = Net()
