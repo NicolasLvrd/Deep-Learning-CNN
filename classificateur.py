@@ -10,19 +10,23 @@ from torch.utils.data import DataLoader, TensorDataset
 from torchvision import datasets
 from torchvision.transforms import ToTensor, Lambda
 
-docCount = 5;
+docCount = 20;
 
 #> hyperparamètres
 learning_rate = 1e-3
 batch_size = 32
 epochs = 20
 
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Using {device} device")
+
 #> chargement du de données
 datasets = []
 
 code = {1247:0 , 1302:1 , 1326:2 , 170:3 , 187:4 , 237:5 , 2473:6 , 29193:7 , 29662:8 , 29663:9 , 30324:10 , 30325:11 , 32248:12 , 32249:13 , 40357:14 , 40358:15, 480:16 , 58:17 , 7578:18, 86:19 , 0:20 , 1:21 , 2:22}
 
-path = "data\CTce_ThAb_b33x33_n1000_8bit\CTce_ThAb_b33x33_n1000_8bit"
+path = "data\CTce_ThAb_b33x33_n1000_8bit"
 directory = os.fsencode(path)
 
 '''
@@ -116,9 +120,11 @@ all_labels = np.vectorize(dic.get)(all_labels)
 
 tensor_labels = torch.from_numpy(all_labels)   
 tensor_labels = tensor_labels.type(torch.FloatTensor)
+tensor_labels = tensor_labels.to(device)
 
 tensor_images = torch.from_numpy(all_images)
 tensor_images = tensor_images.type(torch.FloatTensor)
+tensor_images = tensor_images.to(device)
 
 dataset = TensorDataset(tensor_images,tensor_labels) 
 print("Done.")
@@ -139,13 +145,15 @@ images, labels = dataiter.next()
 print("IMAGES :", images.shape)
 print("LABELS :", labels.shape)
 img = images[0][0]
+img = img.cpu()
 npimg = img.numpy()
 plt.imshow(npimg)
 plt.show()
 print(labels[0])
 
 #for i, (input, target) in enumerate(test_dataloader):
-#    print(target)
+#    print(target)*
+
 
 #> définition du réseau
 class Net(nn.Module):
@@ -200,6 +208,7 @@ class Net(nn.Module):
         return x
 
 model = Net()
+model = Net().to(device)
 model.to(torch.float)
 
 #> boucle d'apprentissage
