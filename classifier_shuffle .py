@@ -10,12 +10,12 @@ from torch.utils.data import DataLoader, TensorDataset
 from torchvision import datasets
 from torchvision.transforms import ToTensor, Lambda
 
-docCount = 20;
+docCount = 1;
 
 #> hyperparamètres
 learning_rate = 1e-3
-batch_size = 512
-epochs = 10
+batch_size = 64
+epochs = 1
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -95,10 +95,10 @@ for file in os.listdir(directory):
     filename = os.fsdecode(file)
     if filename.endswith(".csv"):
         print("Reading ", filename)
-        labels = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=0, max_rows=10000)
+        labels = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=0)
         all_labels_list.append(labels)
 
-        Array1d_images = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=np.arange(1,1090), max_rows=10000)
+        Array1d_images = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=np.arange(1,1090))
         #Array1d_images = np.floor(Array1d_images)
         Array2d_images = Array1d_images.reshape(Array1d_images.shape[0], 1, 33, 33)
         all_images_list.append(Array2d_images)
@@ -190,13 +190,13 @@ class Net(nn.Module):
 
     def __init__(self):
         super().__init__()
-        # 256 x 33 x 33
-        self.conv1 = nn.Conv2d(1, 20, 18, stride=1, padding=0, dilation=1) # 1 x 18 x 18
-        self.pool = nn.MaxPool2d(2) # 10 x 9 x 9
-        self.conv2 = nn.Conv2d(20, 40, 4, stride=1, padding=0, dilation=1) # 20 x 4 x 4
+        # 1 x 33 x 33
+        self.conv1 = nn.Conv2d(1, 20, 18, stride=1, padding=0, dilation=1)
+        self.pool = nn.MaxPool2d(2)
+        self.conv2 = nn.Conv2d(20, 40, 4, stride=1, padding=0, dilation=1)
         self.fc1 = nn.Linear(160, 80)
         self.fc2 = nn.Linear(80, 30)
-        self.fc3 = nn.Linear(30, 10)
+        self.fc3 = nn.Linear(30, 23)
 
     def forward(self, x):
         #print("start :", x.shape)
@@ -230,6 +230,11 @@ def train_loop(dataloader, model, loss_fn, optimizer):
         #print(X.shape)
         # Compute prediction and loss
         pred = model(X)
+        print("----------------------------------------")
+        print(pred.shape)
+        print(y.shape)
+        print(pred)
+        print(y)
         loss = loss_fn(pred, y.long())
         train_loss += loss_fn(pred, y.long()).item()
 
