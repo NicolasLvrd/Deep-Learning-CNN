@@ -9,6 +9,9 @@ from torch import TracingState, nn, tensor, tensor_split
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import datasets
 from torchvision.transforms import ToTensor, Lambda
+from sklearn.metrics import confusion_matrix
+import seaborn as sn
+import pandas as pd
 
 from ignite.engine import *
 from ignite.handlers import *
@@ -18,7 +21,7 @@ from ignite.contrib.metrics.regression import *
 from ignite.contrib.metrics import *
 
 
-docCount = 2;
+docCount = 20;
 
 #> hyperparamètres
 learning_rate = 1e-3
@@ -44,9 +47,10 @@ for file in os.listdir(directory):
     if filename.endswith(".csv"):
         print("Reading ", filename)
 
-        labels = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=0)
-        #labels = np.vectorize(code.get)(labels)
+        labels = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=0) #, max_rows=5000
+        labels = np.vectorize(code.get)(labels)
 
+        '''
         labels_set = np.unique(labels)
 
         dic = {}
@@ -54,12 +58,14 @@ for file in os.listdir(directory):
             dic[labels_set[i]] = i
 
         labels = np.vectorize(dic.get)(labels)
+        print(labels)
 
+        '''
         labels_tensor = torch.from_numpy(labels)
         labels_tensor = labels_tensor.type(torch.FloatTensor)
         labels_tensor = labels_tensor.to(device)
 
-        images_1D = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=np.arange(1,1090))
+        images_1D = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=np.arange(1,1090)) #, max_rows=5000
         images_2D = images_1D.reshape(images_1D.shape[0], 1, 33, 33)
         images_tensor = torch.from_numpy(images_2D)
         images_tensor = images_tensor.type(torch.FloatTensor)
@@ -74,8 +80,8 @@ for file in os.listdir(directory):
 #patients = torch.utils.data.ConcatDataset(patients) // à ne pas considérer
 #train_sampler, valid_sampler = torch.utils.data.random_split((patients), [math.floor(len(patients)*0.8), len(patients)-math.floor(len(patients)*0.8)])
 
-#for i in range(4):
-#    groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
+for i in range(4):
+    groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
 
 
 
@@ -100,9 +106,7 @@ class Net(nn.Module):
         x = self.fc3(x)
         return x
 
-model = Net()
-model = Net().to(device)
-model.to(torch.float)
+
 
 #> boucle d'apprentissage
 def train_loop(dataloader, model, loss_fn, optimizer):
@@ -129,17 +133,22 @@ def train_loop(dataloader, model, loss_fn, optimizer):
 
 #> boucle de validation
 def valid_loop(dataloader, model, loss_fn):
-    y_pred = []
-    y_true = []
+    #y_pred = []
+    #y_true = []
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     test_loss, correct = 0, 0
-
+    all_preds = torch.tensor([])
+    all_labels = torch.tensor([])
     with torch.no_grad():
         for X, y in dataloader:
             pred = model(X)
-            y_pred.extend(pred)
-            y_true.extend(y)
+            all_preds = torch.cat((all_preds, pred), dim=0)
+            all_labels = torch.cat((all_labels, y), dim=0)
+            #output = (torch.max(torch.exp(pred), 1)[1]).data.cpu().numpy()
+            #label = y.data.cpu().numpy()
+            #y_pred.extend(output)
+            #y_true.extend(label)
 
             test_loss += loss_fn(pred, y.long()).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
@@ -150,44 +159,104 @@ def valid_loop(dataloader, model, loss_fn):
     print("    loss: ", test_loss)
     print("    accuracy: ", 100*correct)
     print("")
-    return y_pred, y_true
+    #return y_pred, y_true
+    return all_preds, all_labels
 
-#> fonction de perte et algorythme d'optimisation
-loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+
 
 def eval_step(engine, batch):
     return batch
 
 default_evaluator = Engine(eval_step)
 
+def reset_weights(m):
+  '''
+    Try resetting model weights to avoid
+    weight leakage.
+  '''
+  for layer in m.children():
+   if hasattr(layer, 'reset_parameters'):
+    print(f'Reset trainable parameters of layer = {layer}')
+    layer.reset_parameters()
+
 #> execution de l'apprentissage et des tests
-for k in range(1): # itération sur 4 plis
+for k in range(4): # itération sur 4 plis
     print(f"Fold {k+1}\n-------------------------------\n-------------------------------")
-    #train_sampler = torch.utils.data.ConcatDataset(( groups[(k+1)%4], groups[(k+2)%4], groups[(k+3)%4] ))
-    #valid_sampler = groups[k]
-    train_sampler = patients[0]
-    valid_sampler = patients[1]
+    model = Net()
+    model = Net().to(device)
+    model.to(torch.float)
+    model.apply(reset_weights)
+
+    #> fonction de perte et algorythme d'optimisation
+    loss_fn = nn.CrossEntropyLoss()
+    #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    train_sampler = torch.utils.data.ConcatDataset(( groups[(k+1)%4], groups[(k+2)%4], groups[(k+3)%4] ))
+    valid_sampler = groups[k]
     train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True)
     valid_dataloader = DataLoader(valid_sampler, batch_size=batch_size, shuffle=True)
 
-    y_pred_all = []
-    y_true_all = []
+    #y_pred_all = []
+    #y_true_all = []
+    all_preds = torch.tensor([])
+    all_labels = torch.tensor([])
     for t in range(epochs): # itération sur les epochs
         print(f"Epoch {t+1}\n-------------------------------")
         train_loop(train_dataloader, model, loss_fn, optimizer)
-        y_pred, y_true = valid_loop(valid_dataloader, model, loss_fn)
-        y_pred_all.extend(y_pred)
-        y_true_all.extend(y_true)
+        valid_preds, valid_labels = valid_loop(valid_dataloader, model, loss_fn)
+        all_preds = torch.cat((all_preds, valid_preds), dim=0)
+        all_labels = torch.cat((all_labels, valid_labels), dim=0)
+        #y_pred_all.extend(y_pred)
+        #y_true_all.extend(y_true)
     print("Done!")
+
+    stacked = torch.stack(
+    (
+        all_labels
+        ,all_preds.argmax(dim=1)
+    )
+    ,dim=1
+    )
+    print(stacked)
+
+    cmt = torch.zeros(23,23, dtype=torch.int64)
+
+    for p in stacked:
+        tl, pl = p.tolist()
+        tl = int(tl)
+        pl = int(pl)
+        cmt[tl, pl] = cmt[tl, pl] + 1
+    
+    print(cmt)
+
+    np.set_printoptions(suppress=False)
+    cmt = cmt.numpy()
+
+    np.savetxt("./output/fold"+str(k)+".csv", cmt, fmt='%1.1d', delimiter=';')
+
+
+    '''
     metric = ignite.metrics.confusion_matrix.ConfusionMatrix(num_classes=23)
     metric.attach(default_evaluator, 'cm')
     #y_pred_tensor = torch.FloatTensor(y_pred_all)
     #y_true_tensor = torch.FloatTensor(y_true_all)
     y_pred = torch.stack(y_pred_all)
+    y_pred = torch.FloatTensor(y_pred)
     print(y_pred)
     a = input("yolo")
     y_true = torch.stack(y_true_all)
+    y_true = torch.FloatTensor(y_true)
     print(y_true)
     state = default_evaluator.run([[y_pred, y_true]])
     print(state.metrics['cm'])
+    '''
+    '''
+    classes = {'trachea', 'right lung', 'left lung', 'pancreas', 'gallbladder', 'urinary bladder', 'sternum', 'first lumbar vertebra', 'right kidney', 'left kidney', 'right adrenal gland', 'left adrenal gland', 'right psoas major', 'left psoas major', 'muscle body of right rectus abdominis', 'muscle body of left rectus abdominis', 'aorta', 'liver', 'thyroid gland', 'spleen', 'background', 'body envelope', 'thorax-abdomen'}
+    cf_matrix = confusion_matrix(y_true_all, y_pred_all)
+    df_cm = pd.DataFrame(cf_matrix/np.sum(cf_matrix) *10, index = [i for i in classes],
+                     columns = [i for i in classes])
+    plt.figure(figsize = (12,7))
+    sn.heatmap(df_cm, annot=True)
+    plt.savefig('output.png')
+    '''
