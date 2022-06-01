@@ -9,9 +9,6 @@ from torch import TracingState, nn, tensor, tensor_split
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import datasets
 from torchvision.transforms import ToTensor, Lambda
-from sklearn.metrics import confusion_matrix
-import seaborn as sn
-import pandas as pd
 
 from ignite.engine import *
 from ignite.handlers import *
@@ -26,7 +23,7 @@ docCount = 20;
 #> hyperparamètres
 learning_rate = 1e-3
 batch_size = 64
-epochs = 25
+epochs = 1
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -62,14 +59,14 @@ for file in os.listdir(directory):
 
         '''
         labels_tensor = torch.from_numpy(labels)
-        labels_tensor.type(torch.FloatTensor)
-        #labels_tensor.to(device)
+        labels_tensor = labels_tensor.type(torch.FloatTensor)
+        labels_tensor.to(device)
 
         images_1D = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=np.arange(1,1090)) #, max_rows=5000
         images_2D = images_1D.reshape(images_1D.shape[0], 1, 33, 33)
         images_tensor = torch.from_numpy(images_2D)
-        images_tensor.type(torch.FloatTensor)
-        #images_tensor.to(device)
+        images_tensor = images_tensor.type(torch.FloatTensor)
+        images_tensor.to(device)
 
         patients.append(TensorDataset(images_tensor, labels_tensor))
 
@@ -82,7 +79,6 @@ for file in os.listdir(directory):
 
 for i in range(4):
     groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
-
 
 
 #> définition du réseau
@@ -135,6 +131,7 @@ def train_loop(dataloader, model, loss_fn, optimizer):
     print("TRAIN LOOP")
     print("    loss: ", train_loss)
     print("    accuracy: ", 100*correct)
+    return np.array([train_loss, correct])
 
 #> boucle de validation
 def valid_loop(dataloader, model, loss_fn):
@@ -168,7 +165,7 @@ def valid_loop(dataloader, model, loss_fn):
     print("    accuracy: ", 100*correct)
     print("")
     #return y_pred, y_true
-    return all_preds, all_labels
+    return all_preds, all_labels, np.array([test_loss, correct])
 
 
 
@@ -204,6 +201,7 @@ for k in range(4): # itération sur 4 plis
     train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True)
     
     valid_sampler = groups[k]
+    
     '''
     for i in range(5):
         wished_idx = []
@@ -212,23 +210,30 @@ for k in range(4): # itération sur 4 plis
                 wished_idx.append(idx)
             #indices = [idx for idx, target in enumerate(valid_sampler.datasets[i]) if target in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,15, 16, 17, 18, 19]]
         valid_sampler.datasets[i] = torch.utils.data.Subset(valid_sampler.datasets[i], wished_idx)
-    print(valid_sampler)
+    print(valid_sampler.datasets[i])
     '''
+
     valid_dataloader = DataLoader(valid_sampler, batch_size=batch_size, shuffle=True)
 
-    #y_pred_all = []
-    #y_true_all = []
+    fold_perf = np.array([])
     all_preds = torch.tensor([])
     all_labels = torch.tensor([])
     for t in range(epochs): # itération sur les epochs
         print(f"Epoch {t+1}\n-------------------------------")
-        train_loop(train_dataloader, model, loss_fn, optimizer)
-        valid_preds, valid_labels = valid_loop(valid_dataloader, model, loss_fn)
+        epoch_train_perf = train_loop(train_dataloader, model, loss_fn, optimizer)
+        print(epoch_train_perf)
+        print(np.insert(epoch_train_perf, 0, t))
+        fold_perf = np.append(fold_perf, np.insert(epoch_train_perf, 0, t), axis=0)
+        valid_preds, valid_labels, epoch_valid_perf = valid_loop(valid_dataloader, model, loss_fn)
+        fold_perf = np.append(fold_perf, np.insert(epoch_valid_perf, 0, t), axis=None)
         all_preds = torch.cat((all_preds, valid_preds), dim=0)
         all_labels = torch.cat((all_labels, valid_labels), dim=0)
-        #y_pred_all.extend(y_pred)
-        #y_true_all.extend(y_true)
     print("Done!")
+
+    print("folf_pref: ", fold_perf)
+    np.savetxt("./output/fold_perf"+str(k)+".csv", fold_perf, fmt='%1f', delimiter=';') #%1.5f
+
+    torch.save(model.state_dict(), "./output/fold"+str(k)+".pt")
 
     stacked = torch.stack(
     (

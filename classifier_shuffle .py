@@ -231,9 +231,8 @@ model.to(torch.float)
 def train_loop(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
     correct, train_loss = 0, 0
+    dataloader.data.to(device)
     for batch, (X, y) in enumerate(dataloader):
-        X.to(device)
-        y.to(device)
         #print(X.shape)
         # Compute prediction and loss
         pred = model(X)
@@ -257,13 +256,12 @@ def train_loop(dataloader, model, loss_fn, optimizer):
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
             print(f"Accuracy: {(100*correct):>0.1f}%")
         '''
-        X.to('cpu')
-        y.to('cpu')
     train_loss /= len(dataloader)
     correct /= size
     print("TRAIN LOOP")
     print("    loss: ", train_loss)
     print("    accuracy: ", 100*correct)
+    dataloader.data.to('cpu')
 
 #> boucle de test
 def test_loop(dataloader, model, loss_fn):
