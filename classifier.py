@@ -26,7 +26,7 @@ docCount = 20;
 #> hyperparamètres
 learning_rate = 1e-3
 batch_size = 64
-epochs = 1
+epochs = 25
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -62,14 +62,14 @@ for file in os.listdir(directory):
 
         '''
         labels_tensor = torch.from_numpy(labels)
-        labels_tensor = labels_tensor.type(torch.FloatTensor)
-        labels_tensor = labels_tensor.to(device)
+        labels_tensor.type(torch.FloatTensor)
+        #labels_tensor.to(device)
 
         images_1D = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=np.arange(1,1090)) #, max_rows=5000
         images_2D = images_1D.reshape(images_1D.shape[0], 1, 33, 33)
         images_tensor = torch.from_numpy(images_2D)
-        images_tensor = images_tensor.type(torch.FloatTensor)
-        images_tensor = images_tensor.to(device)
+        images_tensor.type(torch.FloatTensor)
+        #images_tensor.to(device)
 
         patients.append(TensorDataset(images_tensor, labels_tensor))
 
@@ -90,16 +90,18 @@ class Net(nn.Module):
     def __init__(self):
         super().__init__()
         # 1 x 33 x 33
-        self.conv1 = nn.Conv2d(1, 20, 18, stride=1, padding=0, dilation=1)
-        self.pool = nn.MaxPool2d(2)
-        self.conv2 = nn.Conv2d(20, 40, 4, stride=1, padding=0, dilation=1)
-        self.fc1 = nn.Linear(160, 80)
-        self.fc2 = nn.Linear(80, 30)
-        self.fc3 = nn.Linear(30, 23)
+        self.conv1 = nn.Conv2d(1, 20, 5)
+        self.pool = nn.MaxPool2d(2,2)
+        self.conv2 = nn.Conv2d(20, 40, 3)
+        self.conv3 = nn.Conv2d(40, 60, 2)
+        self.fc1 = nn.Linear(240, 180)
+        self.fc2 = nn.Linear(180, 75)
+        self.fc3 = nn.Linear(75, 23)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
+        x = self.pool(F.relu(self.conv3(x)))
         x = torch.flatten(x, 1) # flatten all dimensions except batch
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
@@ -113,6 +115,8 @@ def train_loop(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
     correct, train_loss = 0, 0
     for batch, (X, y) in enumerate(dataloader):
+        X.to(device)
+        y.to(device)
         # Compute prediction and loss
         pred = model(X)
         loss = loss_fn(pred, y.long())
@@ -124,7 +128,8 @@ def train_loop(dataloader, model, loss_fn, optimizer):
         optimizer.step()
 
         correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-
+        X.to('cpu')
+        y.to('cpu')
     train_loss /= len(dataloader)
     correct /= size
     print("TRAIN LOOP")
@@ -142,6 +147,8 @@ def valid_loop(dataloader, model, loss_fn):
     all_labels = torch.tensor([])
     with torch.no_grad():
         for X, y in dataloader:
+            X.to(device)
+            y.to(device)
             pred = model(X)
             all_preds = torch.cat((all_preds, pred), dim=0)
             all_labels = torch.cat((all_labels, y), dim=0)
@@ -152,7 +159,8 @@ def valid_loop(dataloader, model, loss_fn):
 
             test_loss += loss_fn(pred, y.long()).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-
+            X.to('cpu')
+            y.to('cpu')
     test_loss /= num_batches
     correct /= size
     print("TEST LOOP")
@@ -193,8 +201,19 @@ for k in range(4): # itération sur 4 plis
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     train_sampler = torch.utils.data.ConcatDataset(( groups[(k+1)%4], groups[(k+2)%4], groups[(k+3)%4] ))
-    valid_sampler = groups[k]
     train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True)
+    
+    valid_sampler = groups[k]
+    '''
+    for i in range(5):
+        wished_idx = []
+        for idx, label in enumerate(valid_sampler.datasets[i]):
+            if label in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,15, 16, 17, 18, 19]:
+                wished_idx.append(idx)
+            #indices = [idx for idx, target in enumerate(valid_sampler.datasets[i]) if target in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,15, 16, 17, 18, 19]]
+        valid_sampler.datasets[i] = torch.utils.data.Subset(valid_sampler.datasets[i], wished_idx)
+    print(valid_sampler)
+    '''
     valid_dataloader = DataLoader(valid_sampler, batch_size=batch_size, shuffle=True)
 
     #y_pred_all = []

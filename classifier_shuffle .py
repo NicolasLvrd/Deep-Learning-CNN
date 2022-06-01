@@ -120,11 +120,11 @@ all_labels = np.vectorize(dic.get)(all_labels)
 
 tensor_labels = torch.from_numpy(all_labels)   
 tensor_labels = tensor_labels.type(torch.FloatTensor)
-tensor_labels = tensor_labels.to(device)
+#tensor_labels = tensor_labels.to(device)
 
 tensor_images = torch.from_numpy(all_images)
 tensor_images = tensor_images.type(torch.FloatTensor)
-tensor_images = tensor_images.to(device)
+#tensor_images = tensor_images.to(device)
 
 dataset = TensorDataset(tensor_images,tensor_labels) 
 print("Done.")
@@ -191,16 +191,18 @@ class Net(nn.Module):
     def __init__(self):
         super().__init__()
         # 1 x 33 x 33
-        self.conv1 = nn.Conv2d(1, 20, 18, stride=1, padding=0, dilation=1)
-        self.pool = nn.MaxPool2d(2)
-        self.conv2 = nn.Conv2d(20, 40, 4, stride=1, padding=0, dilation=1)
-        self.fc1 = nn.Linear(160, 80)
-        self.fc2 = nn.Linear(80, 30)
-        self.fc3 = nn.Linear(30, 23)
+        self.conv1 = nn.Conv2d(1, 20, 5) #, stride=1, padding=0, dilation=1
+        self.pool = nn.MaxPool2d(2,2)
+        self.conv2 = nn.Conv2d(20, 40, 3) #, stride=1, padding=0, dilation=1
+        self.conv3 = nn.Conv2d(40, 60, 2) #, stride=1, padding=0, dilation=1
+        self.fc1 = nn.Linear(240, 180)
+        self.fc2 = nn.Linear(180, 75)
+        self.fc3 = nn.Linear(75, 23)
 
     def forward(self, x):
-        #print("start :", x.shape)
+        print("start :", x.shape)
         x = self.pool(F.relu(self.conv1(x)))
+        print("after conv1 :", x.shape)
         '''
         x=self.conv1(x)
         print("after conv1 :", x.shape)
@@ -208,7 +210,10 @@ class Net(nn.Module):
         print("after pool :", x.shape)
         '''
         x = self.pool(F.relu(self.conv2(x)))
-        #print("after conv2 :", x.shape)
+        
+        print("after conv2 :", x.shape)
+        x = self.pool(F.relu(self.conv3(x)))
+        print("after conv3 :", x.shape)
         x = torch.flatten(x, 1) # flatten all dimensions except batch
         #print("after flatten :", x.shape)
         x = F.relu(self.fc1(x))
@@ -227,6 +232,8 @@ def train_loop(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
     correct, train_loss = 0, 0
     for batch, (X, y) in enumerate(dataloader):
+        X.to(device)
+        y.to(device)
         #print(X.shape)
         # Compute prediction and loss
         pred = model(X)
@@ -250,6 +257,8 @@ def train_loop(dataloader, model, loss_fn, optimizer):
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
             print(f"Accuracy: {(100*correct):>0.1f}%")
         '''
+        X.to('cpu')
+        y.to('cpu')
     train_loss /= len(dataloader)
     correct /= size
     print("TRAIN LOOP")
