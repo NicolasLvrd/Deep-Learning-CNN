@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 import math
 import ignite
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from torch import TracingState, nn, tensor, tensor_split
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import datasets
@@ -23,7 +23,7 @@ docCount = 20;
 #> hyperparamètres
 learning_rate = 1e-3
 batch_size = 64
-epochs = 1
+epochs = 2
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -60,13 +60,13 @@ for file in os.listdir(directory):
         '''
         labels_tensor = torch.from_numpy(labels)
         labels_tensor = labels_tensor.type(torch.FloatTensor)
-        labels_tensor.to(device)
+        labels_tensor = labels_tensor.to(device)
 
         images_1D = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=np.arange(1,1090)) #, max_rows=5000
         images_2D = images_1D.reshape(images_1D.shape[0], 1, 33, 33)
         images_tensor = torch.from_numpy(images_2D)
         images_tensor = images_tensor.type(torch.FloatTensor)
-        images_tensor.to(device)
+        images_tensor = images_tensor.to(device)
 
         patients.append(TensorDataset(images_tensor, labels_tensor))
 
@@ -111,8 +111,6 @@ def train_loop(dataloader, model, loss_fn, optimizer):
     size = len(dataloader.dataset)
     correct, train_loss = 0, 0
     for batch, (X, y) in enumerate(dataloader):
-        X.to(device)
-        y.to(device)
         # Compute prediction and loss
         pred = model(X)
         loss = loss_fn(pred, y.long())
@@ -124,8 +122,6 @@ def train_loop(dataloader, model, loss_fn, optimizer):
         optimizer.step()
 
         correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-        X.to('cpu')
-        y.to('cpu')
     train_loss /= len(dataloader)
     correct /= size
     print("TRAIN LOOP")
@@ -141,11 +137,11 @@ def valid_loop(dataloader, model, loss_fn):
     num_batches = len(dataloader)
     test_loss, correct = 0, 0
     all_preds = torch.tensor([])
+    all_preds = all_preds.to(device)
     all_labels = torch.tensor([])
+    all_labels = all_labels.to(device)
     with torch.no_grad():
         for X, y in dataloader:
-            X.to(device)
-            y.to(device)
             pred = model(X)
             all_preds = torch.cat((all_preds, pred), dim=0)
             all_labels = torch.cat((all_labels, y), dim=0)
@@ -156,8 +152,6 @@ def valid_loop(dataloader, model, loss_fn):
 
             test_loss += loss_fn(pred, y.long()).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-            X.to('cpu')
-            y.to('cpu')
     test_loss /= num_batches
     correct /= size
     print("TEST LOOP")
@@ -198,7 +192,7 @@ for k in range(4): # itération sur 4 plis
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     train_sampler = torch.utils.data.ConcatDataset(( groups[(k+1)%4], groups[(k+2)%4], groups[(k+3)%4] ))
-    train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True)
+    train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
     
     valid_sampler = groups[k]
     
@@ -213,24 +207,23 @@ for k in range(4): # itération sur 4 plis
     print(valid_sampler.datasets[i])
     '''
 
-    valid_dataloader = DataLoader(valid_sampler, batch_size=batch_size, shuffle=True)
+    valid_dataloader = DataLoader(valid_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
 
-    fold_perf = np.array([])
+    fold_perf = np.array([0,0,0])
     all_preds = torch.tensor([])
+    all_preds = all_preds.to(device)
     all_labels = torch.tensor([])
+    all_labels = all_labels.to(device)
     for t in range(epochs): # itération sur les epochs
         print(f"Epoch {t+1}\n-------------------------------")
         epoch_train_perf = train_loop(train_dataloader, model, loss_fn, optimizer)
-        print(epoch_train_perf)
-        print(np.insert(epoch_train_perf, 0, t))
-        fold_perf = np.append(fold_perf, np.insert(epoch_train_perf, 0, t), axis=0)
+        fold_perf = np.vstack((fold_perf, np.insert(epoch_train_perf, 0, t)))
         valid_preds, valid_labels, epoch_valid_perf = valid_loop(valid_dataloader, model, loss_fn)
-        fold_perf = np.append(fold_perf, np.insert(epoch_valid_perf, 0, t), axis=None)
+        fold_perf = np.vstack((fold_perf, np.insert(epoch_valid_perf, 0, t)))
         all_preds = torch.cat((all_preds, valid_preds), dim=0)
         all_labels = torch.cat((all_labels, valid_labels), dim=0)
     print("Done!")
 
-    print("folf_pref: ", fold_perf)
     np.savetxt("./output/fold_perf"+str(k)+".csv", fold_perf, fmt='%1f', delimiter=';') #%1.5f
 
     torch.save(model.state_dict(), "./output/fold"+str(k)+".pt")
@@ -242,7 +235,6 @@ for k in range(4): # itération sur 4 plis
     )
     ,dim=1
     )
-    print(stacked)
 
     cmt = torch.zeros(23,23, dtype=torch.int64)
 
@@ -252,7 +244,6 @@ for k in range(4): # itération sur 4 plis
         pl = int(pl)
         cmt[tl, pl] = cmt[tl, pl] + 1
     
-    print(cmt)
 
     np.set_printoptions(suppress=False)
     cmt = cmt.numpy()
