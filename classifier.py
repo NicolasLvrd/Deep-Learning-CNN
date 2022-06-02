@@ -9,6 +9,7 @@ from torch import TracingState, nn, tensor, tensor_split
 from torch.utils.data import DataLoader, TensorDataset
 from torchvision import datasets
 from torchvision.transforms import ToTensor, Lambda
+import torchvision
 
 from ignite.engine import *
 from ignite.handlers import *
@@ -22,10 +23,10 @@ docCount = 20 # nombre de patients considérés
 
 #> hyperparamètres
 learning_rate = 1e-3
-batch_size = 4
-epochs = 1
+batch_size = 128
+epochs = 55
 
-# régularisation L2, par Szymon Maszke
+# régularisation L1, par Szymon Maszke
 # https://stackoverflow.com/questions/42704283/adding-l1-l2-regularization-in-pytorch
 class L1(torch.nn.Module):
     def __init__(self, module, weight_decay=0.00001):
@@ -59,6 +60,8 @@ class L1(torch.nn.Module):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
+transform = torchvision.transforms.Normalize(127.5, 127.5) # mapping des niveaux de gris dans [-1, 1]
+
 # lecture des données et création des datasets
 code = {1247:0 , 1302:1 , 1326:2 , 170:3 , 187:4 , 237:5 , 2473:6 , 29193:7 , 29662:8 , 29663:9 , 30324:10 , 30325:11 , 32248:12 , 32249:13 , 40357:14 , 40358:15, 480:16 , 58:17 , 7578:18, 86:19 , 0:20 , 1:21 , 2:22} # dictionnaire des labels originaux avec des labels dans [0;22] pour utiliser CE loss
 
@@ -74,28 +77,19 @@ for file in os.listdir(directory):
     if filename.endswith(".csv"):
         print("Reading ", filename)
 
-        labels = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=0) #, max_rows=5000
-        labels = np.vectorize(code.get)(labels)
-
-        '''
-        labels_set = np.unique(labels)
-
-        dic = {}
-        for i in range(len(labels_set)):
-            dic[labels_set[i]] = i
-
-        labels = np.vectorize(dic.get)(labels)
-        print(labels)
-
-        '''
+        labels = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=0)
+        labels = np.vectorize(code.get)(labels) # mapping des labels
         labels_tensor = torch.from_numpy(labels)
         labels_tensor = labels_tensor.type(torch.FloatTensor)
         labels_tensor = labels_tensor.to(device)
 
-        images_1D = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=np.arange(1,1090)) #, max_rows=5000
+        images_1D = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=np.arange(1,1090))
         images_2D = images_1D.reshape(images_1D.shape[0], 1, 33, 33)
         images_tensor = torch.from_numpy(images_2D)
         images_tensor = images_tensor.type(torch.FloatTensor)
+        print("before: ", images_tensor)
+        images_tensor = transform(images_tensor)
+        print("after: ", images_tensor)
         images_tensor = images_tensor.to(device)
 
         patients.append(TensorDataset(images_tensor, labels_tensor))
@@ -104,18 +98,13 @@ for file in os.listdir(directory):
         if(cpt == docCount):
             break
 
-#patients = torch.utils.data.ConcatDataset(patients) // à ne pas considérer
-#train_sampler, valid_sampler = torch.utils.data.random_split((patients), [math.floor(len(patients)*0.8), len(patients)-math.floor(len(patients)*0.8)])
-
 for i in range(4):
     groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
-
 
 #> définition du réseau
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        # 1 x 33 x 33
         self.conv1 = nn.Conv2d(1, 20, 5)
         self.pool = nn.MaxPool2d(2,2)
         self.conv2 = nn.Conv2d(20, 40, 3)
@@ -133,8 +122,6 @@ class Net(nn.Module):
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
         return x
-
-
 
 #> boucle d'apprentissage
 def train_loop(dataloader, model, loss_fn, optimizer):
@@ -157,7 +144,7 @@ def train_loop(dataloader, model, loss_fn, optimizer):
     print("TRAIN LOOP")
     print("    loss: ", train_loss)
     print("    accuracy: ", 100*correct)
-    return np.array([train_loss, correct])
+    return np.array([train_loss, correct]) # pour écriture dans csv
 
 #> boucle de validation
 def valid_loop(dataloader, model, loss_fn):
@@ -166,36 +153,32 @@ def valid_loop(dataloader, model, loss_fn):
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     test_loss, correct = 0, 0
+
     all_preds = torch.tensor([])
     all_preds = all_preds.to(device)
     all_labels = torch.tensor([])
     all_labels = all_labels.to(device)
+
     with torch.no_grad():
         for X, y in dataloader:
             pred = model(X)
+
             all_preds = torch.cat((all_preds, pred), dim=0)
             all_labels = torch.cat((all_labels, y), dim=0)
-            #output = (torch.max(torch.exp(pred), 1)[1]).data.cpu().numpy()
-            #label = y.data.cpu().numpy()
-            #y_pred.extend(output)
-            #y_true.extend(label)
 
             test_loss += loss_fn(pred, y.long()).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-            print("pred: ", pred)
-            print("pred.argmax(1): ", pred.argmax(1))
-            print("pred.argmax(1) == y: ", (pred.argmax(1) == y))
-            print("sum: ", (pred.argmax(1) == y).type(torch.float).sum())
+            # print("pred: ", pred)
+            # print("pred.argmax(1): ", pred.argmax(1))
+            # print("pred.argmax(1) == y: ", (pred.argmax(1) == y))
+            # print("sum: ", (pred.argmax(1) == y).type(torch.float).sum())
     test_loss /= num_batches
     correct /= size
     print("TEST LOOP")
     print("    loss: ", test_loss)
     print("    accuracy: ", 100*correct)
     print("")
-    #return y_pred, y_true
     return all_preds, all_labels, np.array([test_loss, correct])
-
-
 
 def eval_step(engine, batch):
     return batch
@@ -222,8 +205,8 @@ for k in range(4): # itération sur 4 plis
 
     #> fonction de perte et algorythme d'optimisation
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #, weight_decay=1e-5
-    #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
+    #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #weight_decay=1e-5
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, betas=(0.95, 0.999), weight_decay=1e-2)
 
     train_sampler = torch.utils.data.ConcatDataset(( groups[(k+1)%4], groups[(k+2)%4], groups[(k+3)%4] ))
     train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
