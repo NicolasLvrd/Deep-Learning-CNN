@@ -18,25 +18,55 @@ from ignite.contrib.metrics.regression import *
 from ignite.contrib.metrics import *
 
 
-docCount = 20;
+docCount = 20 # nombre de patients considérés
 
 #> hyperparamètres
 learning_rate = 1e-3
-batch_size = 64
-epochs = 2
+batch_size = 4
+epochs = 1
 
+# régularisation L2, par Szymon Maszke
+# https://stackoverflow.com/questions/42704283/adding-l1-l2-regularization-in-pytorch
+class L1(torch.nn.Module):
+    def __init__(self, module, weight_decay=0.00001):
+        super().__init__()
+        self.module = module
+        self.weight_decay = weight_decay
 
+        # Backward hook is registered on the specified module
+        self.hook = self.module.register_full_backward_hook(self._weight_decay_hook)
+
+    # Not dependent on backprop incoming values, placeholder
+    def _weight_decay_hook(self, *_):
+        for param in self.module.parameters():
+            # If there is no gradient or it was zeroed out
+            # Zeroed out using optimizer.zero_grad() usually
+            # Turn on if needed with grad accumulation/more safer way
+            # if param.grad is None or torch.all(param.grad == 0.0):
+
+            # Apply regularization on it
+            param.grad = self.regularize(param)
+
+    def regularize(self, parameter):
+        # L1 regularization formula
+        return self.weight_decay * torch.sign(parameter.data)
+
+    def forward(self, *args, **kwargs):
+        # Simply forward and args and kwargs to module
+        return self.module(*args, **kwargs)
+
+# utilisation du GPU si disponible
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
-#> chargement du de données
-code = {1247:0 , 1302:1 , 1326:2 , 170:3 , 187:4 , 237:5 , 2473:6 , 29193:7 , 29662:8 , 29663:9 , 30324:10 , 30325:11 , 32248:12 , 32249:13 , 40357:14 , 40358:15, 480:16 , 58:17 , 7578:18, 86:19 , 0:20 , 1:21 , 2:22}
+# lecture des données et création des datasets
+code = {1247:0 , 1302:1 , 1326:2 , 170:3 , 187:4 , 237:5 , 2473:6 , 29193:7 , 29662:8 , 29663:9 , 30324:10 , 30325:11 , 32248:12 , 32249:13 , 40357:14 , 40358:15, 480:16 , 58:17 , 7578:18, 86:19 , 0:20 , 1:21 , 2:22} # dictionnaire des labels originaux avec des labels dans [0;22] pour utiliser CE loss
 
 path = "data\CTce_ThAb_b33x33_n1000_8bit"
 directory = os.fsencode(path)
 
-patients = []
-groups = []
+patients = [] # datasets de chaque patient
+groups = [] # datasets regroupés par groupe de 5 patients pour le 4-folds
 
 cpt = 0
 for file in os.listdir(directory):
@@ -152,6 +182,10 @@ def valid_loop(dataloader, model, loss_fn):
 
             test_loss += loss_fn(pred, y.long()).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+            print("pred: ", pred)
+            print("pred.argmax(1): ", pred.argmax(1))
+            print("pred.argmax(1) == y: ", (pred.argmax(1) == y))
+            print("sum: ", (pred.argmax(1) == y).type(torch.float).sum())
     test_loss /= num_batches
     correct /= size
     print("TEST LOOP")
@@ -188,8 +222,8 @@ for k in range(4): # itération sur 4 plis
 
     #> fonction de perte et algorythme d'optimisation
     loss_fn = nn.CrossEntropyLoss()
-    #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #, weight_decay=1e-5
+    #optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
     train_sampler = torch.utils.data.ConcatDataset(( groups[(k+1)%4], groups[(k+2)%4], groups[(k+3)%4] ))
     train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
