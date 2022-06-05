@@ -87,9 +87,7 @@ for file in os.listdir(directory):
         images_2D = images_1D.reshape(images_1D.shape[0], 1, 33, 33)
         images_tensor = torch.from_numpy(images_2D)
         images_tensor = images_tensor.type(torch.FloatTensor)
-        print("before: ", images_tensor)
         images_tensor = transform(images_tensor)
-        print("after: ", images_tensor)
         images_tensor = images_tensor.to(device)
 
         patients.append(TensorDataset(images_tensor, labels_tensor))
