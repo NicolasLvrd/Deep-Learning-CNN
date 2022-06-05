@@ -71,6 +71,7 @@ directory = os.fsencode(path)
 patients = [] # datasets de chaque patient
 groups = [] # datasets regroupés par groupe de 5 patients pour le 4-folds
 
+'''
 cpt = 0
 for file in os.listdir(directory):
     filename = os.fsdecode(file)
@@ -87,16 +88,19 @@ for file in os.listdir(directory):
         images_2D = images_1D.reshape(images_1D.shape[0], 1, 33, 33)
         images_tensor = torch.from_numpy(images_2D)
         images_tensor = images_tensor.type(torch.FloatTensor)
-        print("before: ", images_tensor)
         images_tensor = transform(images_tensor)
-        print("after: ", images_tensor)
         images_tensor = images_tensor.to(device)
 
+        #torch.save(TensorDataset(images_tensor, labels_tensor), "./data/patient"+str(cpt))
         patients.append(TensorDataset(images_tensor, labels_tensor))
 
         cpt += 1
         if(cpt == docCount):
             break
+'''
+
+for i in range(20):
+    patients.append( torch.load("./data/patient"+str(i)) )
 
 for i in range(4):
     groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
@@ -206,7 +210,7 @@ for k in range(4): # itération sur 4 plis
     #> fonction de perte et algorythme d'optimisation
     loss_fn = nn.CrossEntropyLoss()
     #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #weight_decay=1e-5
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, betas=(0.95, 0.999), weight_decay=1e-2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, betas=(0.90, 0.999), weight_decay=0.0099)
 
     train_sampler = torch.utils.data.ConcatDataset(( groups[(k+1)%4], groups[(k+2)%4], groups[(k+3)%4] ))
     train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
