@@ -19,8 +19,6 @@ from ignite.contrib.metrics.regression import *
 from ignite.contrib.metrics import *
 
 
-docCount = 20 # nombre de patients considérés
-
 #> hyperparamètres
 learning_rate = 1e-3
 batch_size = 128
@@ -60,44 +58,8 @@ class L1(torch.nn.Module):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
-transform = torchvision.transforms.Normalize(127.5, 127.5) # mapping des niveaux de gris dans [-1, 1]
-
-# lecture des données et création des datasets
-code = {1247:0 , 1302:1 , 1326:2 , 170:3 , 187:4 , 237:5 , 2473:6 , 29193:7 , 29662:8 , 29663:9 , 30324:10 , 30325:11 , 32248:12 , 32249:13 , 40357:14 , 40358:15, 480:16 , 58:17 , 7578:18, 86:19 , 0:20 , 1:21 , 2:22} # dictionnaire des labels originaux avec des labels dans [0;22] pour utiliser CE loss
-
-path = "data\CTce_ThAb_b33x33_n1000_8bit"
-directory = os.fsencode(path)
-
 patients = [] # datasets de chaque patient
 groups = [] # datasets regroupés par groupe de 5 patients pour le 4-folds
-
-'''
-cpt = 0
-for file in os.listdir(directory):
-    filename = os.fsdecode(file)
-    if filename.endswith(".csv"):
-        print("Reading ", filename)
-
-        labels = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=0)
-        labels = np.vectorize(code.get)(labels) # mapping des labels
-        labels_tensor = torch.from_numpy(labels)
-        labels_tensor = labels_tensor.type(torch.FloatTensor)
-        labels_tensor = labels_tensor.to(device)
-
-        images_1D = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=np.arange(1,1090))
-        images_2D = images_1D.reshape(images_1D.shape[0], 1, 33, 33)
-        images_tensor = torch.from_numpy(images_2D)
-        images_tensor = images_tensor.type(torch.FloatTensor)
-        images_tensor = transform(images_tensor)
-        images_tensor = images_tensor.to(device)
-
-        #torch.save(TensorDataset(images_tensor, labels_tensor), "./data/patient"+str(cpt))
-        patients.append(TensorDataset(images_tensor, labels_tensor))
-
-        cpt += 1
-        if(cpt == docCount):
-            break
-'''
 
 for i in range(20):
     patients.append( torch.load("./data/patient"+str(i)) )
@@ -109,6 +71,7 @@ for i in range(4):
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
+        
         self.conv1 = nn.Conv2d(1, 20, 5)
         self.pool = nn.MaxPool2d(2,2)
         self.conv2 = nn.Conv2d(20, 40, 3)
@@ -116,6 +79,14 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(240, 180)
         self.fc2 = nn.Linear(180, 75)
         self.fc3 = nn.Linear(75, 23)
+        '''
+        self.conv1 = nn.Conv2d(1, 10, 17) # 10 x (33-6+1) x 28
+        self.pool = nn.MaxPool2d(2) # 10 x 7 x 7
+        self.conv2 = nn.Conv2d(10, 20, 3) # 20 x (7-6+1) x 2
+        self.fc1 = nn.Linear(20*3*3, 23)
+        self.fc2 = nn.Linear(23, 46)
+        self.fc3 = nn.Linear(46, 30)
+        '''
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
@@ -210,7 +181,7 @@ for k in range(4): # itération sur 4 plis
     #> fonction de perte et algorythme d'optimisation
     loss_fn = nn.CrossEntropyLoss()
     #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #weight_decay=1e-5
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, betas=(0.90, 0.999), weight_decay=0.0099)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0) #, betas=(0.90, 0.999), weight_decay=0.0099
 
     train_sampler = torch.utils.data.ConcatDataset(( groups[(k+1)%4], groups[(k+2)%4], groups[(k+3)%4] ))
     train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
