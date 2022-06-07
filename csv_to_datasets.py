@@ -25,19 +25,32 @@ for file in os.listdir(directory):
 
         labels = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=0)
         labels = np.vectorize(code.get)(labels) # mapping des labels
+        wished_idx = []
+        for idx, label in enumerate(labels):
+            if int(label) not in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,15, 16, 17, 18, 19]:
+                wished_idx.append(idx)
+        labels_test = np.delete(labels, wished_idx)
         labels_tensor = torch.from_numpy(labels)
+        labels_tensor_test = torch.from_numpy(labels_test)
         labels_tensor = labels_tensor.type(torch.FloatTensor)
+        labels_tensor_test = labels_tensor_test.type(torch.FloatTensor)
         # labels_tensor = labels_tensor.to(device)
 
         images_1D = np.loadtxt(path + "\\" + filename, delimiter=",", usecols=np.arange(1,1090))
+        images_1D_test = np.delete(images_1D, wished_idx, axis=0)
         images_2D = images_1D.reshape(images_1D.shape[0], 1, 33, 33)
+        images_2D_test = images_1D_test.reshape(images_1D_test.shape[0], 1, 33, 33)
         images_tensor = torch.from_numpy(images_2D)
+        images_tensor_test = torch.from_numpy(images_2D_test)
         images_tensor = images_tensor.type(torch.FloatTensor)
+        images_tensor_test = images_tensor_test.type(torch.FloatTensor)
         images_tensor = transform(images_tensor)
+        images_tensor_test = transform(images_tensor_test)
         # images_tensor = images_tensor.to(device)
 
-        torch.save(TensorDataset(images_tensor, labels_tensor), "./data/patient"+str(cpt))
+        torch.save(TensorDataset(images_tensor, labels_tensor), "./data/train_patient"+str(cpt))
         # patients.append(TensorDataset(images_tensor, labels_tensor))
+        torch.save(TensorDataset(images_tensor_test, labels_tensor_test), "./data/test_patient"+str(cpt))
 
         cpt += 1
         if(cpt == docCount):

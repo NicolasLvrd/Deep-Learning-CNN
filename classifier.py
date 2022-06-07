@@ -58,27 +58,27 @@ class L1(torch.nn.Module):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
-patients = [] # datasets de chaque patient
-groups = [] # datasets regroupés par groupe de 5 patients pour le 4-folds
+train_groups = [] # datasets regroupés par groupe de 5 patients pour le 4-folds
+test_groups = []
 
+patients = [] # datasets de chaque patient
 for i in range(20):
-    patients.append( torch.load("./data/patient"+str(i)) )
+    patients.append( torch.load("./data/train_patient"+str(i), map_location=torch.device(device)) )
 
 for i in range(4):
-    groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
+    train_groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
+
+patients = [] # datasets de chaque patient
+for i in range(20):
+    patients.append( torch.load("./data/test_patient"+str(i), map_location=torch.device(device)) )
+
+for i in range(4):
+    test_groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
 
 #> définition du réseau
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        
-        self.conv1 = nn.Conv2d(1, 6, 7)
-        self.pool = nn.MaxPool2d(2,2)
-        self.conv2 = nn.Conv2d(6, 16, 7)
-        self.conv3 = nn.Conv2d(40, 15, 2)
-        self.fc1 = nn.Linear(144, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 23)
         '''
         self.conv1 = nn.Conv2d(1, 10, 17) # 10 x (33-6+1) x 28
         self.pool = nn.MaxPool2d(2) # 10 x 7 x 7
@@ -87,11 +87,29 @@ class Net(nn.Module):
         self.fc2 = nn.Linear(23, 46)
         self.fc3 = nn.Linear(46, 30)
         '''
+        
+        self.conv1 = nn.Conv2d(1, 20, 5)
+        self.pool = nn.MaxPool2d(2,2)
+        self.conv2 = nn.Conv2d(20, 40, 3)
+        self.conv3 = nn.Conv2d(40, 60, 2)
+        self.fc1 = nn.Linear(240, 180)
+        self.fc2 = nn.Linear(180, 75)
+        self.fc3 = nn.Linear(75, 23)
+        
+        '''
+        self.conv1 = nn.Conv2d(1, 6, 7)
+        self.pool = nn.MaxPool2d(2,2)
+        self.conv2 = nn.Conv2d(6, 16, 7)
+        self.conv3 = nn.Conv2d(40, 15, 2)
+        self.fc1 = nn.Linear(144, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 23)
+        '''
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        # x = self.pool(F.relu(self.conv3(x)))
+        x = self.pool(F.relu(self.conv3(x)))
         x = torch.flatten(x, 1) # flatten all dimensions except batch
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
@@ -180,13 +198,13 @@ for k in range(4): # itération sur 4 plis
 
     #> fonction de perte et algorythme d'optimisation
     loss_fn = nn.CrossEntropyLoss()
-    #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #weight_decay=1e-5
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0) #, betas=(0.90, 0.999), weight_decay=0.0099
+    # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #weight_decay=1e-5
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) #, betas=(0.90, 0.999), weight_decay=0.0099
 
-    train_sampler = torch.utils.data.ConcatDataset(( groups[(k+1)%4], groups[(k+2)%4], groups[(k+3)%4] ))
+    train_sampler = torch.utils.data.ConcatDataset(( train_groups[(k+1)%4], train_groups[(k+2)%4], train_groups[(k+3)%4] ))
     train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
-    print(len(train_dataloader))
-    valid_sampler = groups[k]
+    
+    valid_sampler = test_groups[k]
     
     '''
     for i in range(5):
