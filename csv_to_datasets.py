@@ -7,7 +7,13 @@ from torch.utils.data import TensorDataset
 
 docCount = 20 # nombre de patients considérés
 
-transform = torchvision.transforms.Normalize(127.5, 127.5) # mapping des niveaux de gris dans [-1, 1]
+train_transform = torchvision.transforms.Compose([
+    torchvision.transforms.Normalize(127.5, 127.5), # mapping des niveaux de gris dans [-1, 1]
+    torchvision.transforms.RandomHorizontalFlip(),
+    torchvision.transforms.RandomRotation(20)
+])
+
+test_transform = torchvision.transforms.Normalize(127.5, 127.5)
 
 # lecture des données et création des datasets
 code = {1247:0 , 1302:1 , 1326:2 , 170:3 , 187:4 , 237:5 , 2473:6 , 29193:7 , 29662:8 , 29663:9 , 30324:10 , 30325:11 , 32248:12 , 32249:13 , 40357:14 , 40358:15, 480:16 , 58:17 , 7578:18, 86:19 , 0:20 , 1:21 , 2:22} # dictionnaire des labels originaux avec des labels dans [0;22] pour utiliser CE loss
@@ -44,8 +50,8 @@ for file in os.listdir(directory):
         images_tensor_test = torch.from_numpy(images_2D_test)
         images_tensor = images_tensor.type(torch.FloatTensor)
         images_tensor_test = images_tensor_test.type(torch.FloatTensor)
-        images_tensor = transform(images_tensor)
-        images_tensor_test = transform(images_tensor_test)
+        images_tensor = train_transform(images_tensor)
+        images_tensor_test = test_transform(images_tensor_test)
         # images_tensor = images_tensor.to(device)
 
         torch.save(TensorDataset(images_tensor, labels_tensor), "./data/train_patient"+str(cpt))
