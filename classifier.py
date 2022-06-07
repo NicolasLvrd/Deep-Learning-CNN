@@ -72,13 +72,13 @@ class Net(nn.Module):
     def __init__(self):
         super().__init__()
         
-        self.conv1 = nn.Conv2d(1, 20, 5)
+        self.conv1 = nn.Conv2d(1, 6, 7)
         self.pool = nn.MaxPool2d(2,2)
-        self.conv2 = nn.Conv2d(20, 40, 3)
-        self.conv3 = nn.Conv2d(40, 60, 2)
-        self.fc1 = nn.Linear(240, 180)
-        self.fc2 = nn.Linear(180, 75)
-        self.fc3 = nn.Linear(75, 23)
+        self.conv2 = nn.Conv2d(6, 16, 7)
+        self.conv3 = nn.Conv2d(40, 15, 2)
+        self.fc1 = nn.Linear(144, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 23)
         '''
         self.conv1 = nn.Conv2d(1, 10, 17) # 10 x (33-6+1) x 28
         self.pool = nn.MaxPool2d(2) # 10 x 7 x 7
@@ -91,7 +91,7 @@ class Net(nn.Module):
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
+        # x = self.pool(F.relu(self.conv3(x)))
         x = torch.flatten(x, 1) # flatten all dimensions except batch
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
@@ -185,7 +185,7 @@ for k in range(4): # itération sur 4 plis
 
     train_sampler = torch.utils.data.ConcatDataset(( groups[(k+1)%4], groups[(k+2)%4], groups[(k+3)%4] ))
     train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
-    
+    print(len(train_dataloader))
     valid_sampler = groups[k]
     
     '''
@@ -200,6 +200,7 @@ for k in range(4): # itération sur 4 plis
     '''
 
     valid_dataloader = DataLoader(valid_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
+    print(len(valid_dataloader))
 
     fold_perf = np.array([0,0,0])
     all_preds = torch.tensor([])
