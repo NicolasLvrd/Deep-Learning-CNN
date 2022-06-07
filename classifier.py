@@ -58,14 +58,22 @@ class L1(torch.nn.Module):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
-patients = [] # datasets de chaque patient
-groups = [] # datasets regroupés par groupe de 5 patients pour le 4-folds
+train_groups = [] # datasets regroupés par groupe de 5 patients pour le 4-folds
+test_groups = []
 
+patients = [] # datasets de chaque patient
 for i in range(20):
-    patients.append( torch.load("./data/patient"+str(i)) )
+    patients.append( torch.load("./data/train_patient"+str(i)) )
 
 for i in range(4):
-    groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
+    train_groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
+
+patients = [] # datasets de chaque patient
+for i in range(20):
+    patients.append( torch.load("./data/test_patient"+str(i)) )
+
+for i in range(4):
+    test_groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
 
 #> définition du réseau
 class Net(nn.Module):
@@ -183,10 +191,10 @@ for k in range(4): # itération sur 4 plis
     #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #weight_decay=1e-5
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=0) #, betas=(0.90, 0.999), weight_decay=0.0099
 
-    train_sampler = torch.utils.data.ConcatDataset(( groups[(k+1)%4], groups[(k+2)%4], groups[(k+3)%4] ))
+    train_sampler = torch.utils.data.ConcatDataset(( train_groups[(k+1)%4], train_groups[(k+2)%4], train_groups[(k+3)%4] ))
     train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
     
-    valid_sampler = groups[k]
+    valid_sampler = test_groups[k]
     
     '''
     for i in range(5):
