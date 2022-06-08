@@ -58,22 +58,36 @@ class L1(torch.nn.Module):
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
 
+'''
 train_groups = [] # datasets regroupés par groupe de 5 patients pour le 4-folds
 test_groups = []
 
 patients = [] # datasets de chaque patient
 for i in range(20):
-    patients.append( torch.load("./data/train_patient"+str(i), map_location=torch.device(device)) )
+    patients.append( torch.load("./data/train_patient"+str(i), map_location=torch.device('cpu')) )
+
 
 for i in range(4):
-    train_groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
+    train_groups.append((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) #torch.utils.data.ConcatDataset(
 
 patients = [] # datasets de chaque patient
 for i in range(20):
-    patients.append( torch.load("./data/test_patient"+str(i), map_location=torch.device(device)) )
+    patients.append( torch.load("./data/test_patient"+str(i), map_location=torch.device('cpu')) )
 
 for i in range(4):
-    test_groups.append( torch.utils.data.ConcatDataset((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) )
+    test_groups.append((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4]))
+'''
+
+train_labels_list = [None]*4
+test_labels_list = [None]*4
+train_images_list = [None]*4
+test_images_list = [None]*4
+
+for i in range(4):
+    train_labels_list[i] = torch.load("./data/train/labels/group"+str(i), map_location=torch.device('cpu'))
+    train_images_list[i] = torch.load("./data/train/images/group"+str(i), map_location=torch.device('cpu'))
+    test_labels_list[i] = torch.load("./data/test/labels/group"+str(i), map_location=torch.device('cpu'))
+    test_images_list[i] = torch.load("./data/test/images/group"+str(i), map_location=torch.device('cpu'))
 
 #> définition du réseau
 class Net(nn.Module):
@@ -201,10 +215,16 @@ for k in range(4): # itération sur 4 plis
     # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #weight_decay=1e-5
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) #, betas=(0.90, 0.999), weight_decay=0.0099
 
-    train_sampler = torch.utils.data.ConcatDataset(( train_groups[(k+1)%4], train_groups[(k+2)%4], train_groups[(k+3)%4] ))
+    train_images = torch.cat( ( train_images_list[(k+1)%4],  train_images_list[(k+2)%4], train_images_list[(k+3)%4]), dim=0 ).to(device)
+    print(train_images.shape)
+    train_labels = torch.cat( ( train_labels_list[(k+1)%4],  train_labels_list[(k+2)%4], train_labels_list[(k+3)%4]) ).to(device) 
+    print(train_labels.shape)
+    train_sampler = TensorDataset(train_images, train_labels)
+    #train_sampler = torch.utils.data.ConcatDataset(( train_groups[(k+1)%4], train_groups[(k+2)%4], train_groups[(k+3)%4] ))
     train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
     
-    valid_sampler = test_groups[k]
+
+    valid_sampler = TensorDataset(test_images_list[k].to(device), test_labels_list[k].to(device))
     
     '''
     for i in range(5):
