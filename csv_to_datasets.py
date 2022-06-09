@@ -1,10 +1,7 @@
-from cgi import test
-from re import I
 import numpy as np
 import torch
 import os
 import torchvision
-from torch.utils.data import TensorDataset
 
 
 docCount = 20 # nombre de patients considérés

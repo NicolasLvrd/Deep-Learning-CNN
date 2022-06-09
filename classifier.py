@@ -1,30 +1,18 @@
 import torch
-import os
 import torch.nn.functional as F
 import numpy as np
-import math
-import ignite
 import matplotlib.pyplot as plt
-from torch import TracingState, nn, tensor, tensor_split
+from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
-from torchvision import datasets
-from torchvision.transforms import ToTensor, Lambda
-import torchvision
-
-from ignite.engine import *
-from ignite.handlers import *
-from ignite.metrics import *
-from ignite.utils import *
-from ignite.contrib.metrics.regression import *
-from ignite.contrib.metrics import *
+import sklearn
 import sys
 
 k = int(sys.argv[1]) # fold number
 
 #> hyperparamètres
-learning_rate = 1e-3
-batch_size = 64
-epochs = 50
+learning_rate = 1e-4
+batch_size = 4
+epochs = 1
 
 # régularisation L1, par Szymon Maszke
 # https://stackoverflow.com/questions/42704283/adding-l1-l2-regularization-in-pytorch
@@ -101,7 +89,7 @@ class Net(nn.Module):
         self.conv2 = nn.Conv2d(6, 16, 5) # 20 x (7-6+1) x 2
         self.fc1 = nn.Linear(400, 150)
         self.fc2 = nn.Linear(150, 46)
-        self.fc3 = nn.Linear(150, 50)
+        self.fc3 = nn.Linear(150, 23)
         self.dropout = nn.Dropout(0.25)
         '''
         
@@ -134,16 +122,17 @@ class Net(nn.Module):
         x = F.relu(self.fc1(x))
         # x = F.relu(self.fc2(x))
         x = self.fc3(x)
+        #print("forward: ", x.shape)
         return x
 
 #> boucle d'apprentissage
 def train_loop(dataloader, model, loss_fn, optimizer):
-    dataiter = iter(dataloader)
-    images, labels = dataiter.next()
-    img = images[0][0]
-    img = img.cpu()
-    npimg = img.numpy()
-    plt.imshow(npimg)
+    #dataiter = iter(dataloader)
+    #images, labels = dataiter.next()
+    #img = images[0][0]
+    #img = img.cpu()
+    #npimg = img.numpy()
+    #plt.imshow(npimg)
     #plt.show()
 
     size = len(dataloader.dataset)
@@ -151,6 +140,11 @@ def train_loop(dataloader, model, loss_fn, optimizer):
     for batch, (X, y) in enumerate(dataloader):
         # Compute prediction and loss
         pred = model(X)
+        #print("    train X: ", X.shape)
+        #print("    train pred: ", pred)
+        #print("    train pred argmax: ", pred.argmax(1))
+        #print("    train pred argmax == y: ", pred.argmax(1) == y)
+        #print("    train y: ", y)
         loss = loss_fn(pred, y.long())
         train_loss += loss_fn(pred, y.long()).item()
 
@@ -175,20 +169,21 @@ def valid_loop(dataloader, model, loss_fn):
     num_batches = len(dataloader)
     test_loss, correct = 0, 0
 
-    all_preds = torch.tensor([])
-    all_preds = all_preds.to(device)
-    all_labels = torch.tensor([])
-    all_labels = all_labels.to(device)
+    all_preds = torch.tensor([]).to('cpu')
+    all_labels = torch.tensor([]).to('cpu')
 
     with torch.no_grad():
         for X, y in dataloader:
             pred = model(X)
-
-            all_preds = torch.cat((all_preds, pred), dim=0)
-            all_labels = torch.cat((all_labels, y), dim=0)
+            soft = nn.Softmax(dim=0)
+            all_preds = torch.cat((all_preds, soft(pred).argmax(1).detach()), dim=0)
+            all_labels = torch.cat((all_labels, y.detach()), dim=0)
 
             test_loss += loss_fn(pred, y.long()).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+            print("    VALID pred: ", pred)
+            print("    VALID y: ", y)
+            #a = input("break")
             # print("pred: ", pred)
             # print("pred.argmax(1): ", pred.argmax(1))
             # print("pred.argmax(1) == y: ", (pred.argmax(1) == y))
@@ -200,11 +195,6 @@ def valid_loop(dataloader, model, loss_fn):
     print("    accuracy: ", 100*correct)
     print("")
     return all_preds, all_labels, np.array([test_loss, correct])
-
-def eval_step(engine, batch):
-    return batch
-
-default_evaluator = Engine(eval_step)
 
 def reset_weights(m):
   '''
@@ -226,57 +216,83 @@ model.apply(reset_weights)
 
 #> fonction de perte et algorythme d'optimisation
 loss_fn = nn.CrossEntropyLoss()
-# optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #weight_decay=1e-5
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,  weight_decay=0) #, betas=(0.90, 0.999), weight_decay=0.0099
+# optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #weight_decay=1e-5
 
-train_images = torch.cat( ( train_images_list[(k+1)%4],  train_images_list[(k+2)%4], train_images_list[(k+3)%4]), dim=0 ).to(device)
-print(train_images.shape)
-train_labels = torch.cat( ( train_labels_list[(k+1)%4],  train_labels_list[(k+2)%4], train_labels_list[(k+3)%4]) ).to(device) 
-print(train_labels.shape)
-train_sampler = TensorDataset(train_images, train_labels)
 #train_sampler = torch.utils.data.ConcatDataset(( train_groups[(k+1)%4], train_groups[(k+2)%4], train_groups[(k+3)%4] ))
+train_images = torch.cat( ( train_images_list[(k+1)%4],  train_images_list[(k+2)%4], train_images_list[(k+3)%4]), dim=0 ).to(device)
+train_labels = torch.cat( ( train_labels_list[(k+1)%4],  train_labels_list[(k+2)%4], train_labels_list[(k+3)%4]) ).to(device) 
+print(torch.unique(train_labels))
+#a = input("break")
+train_sampler = TensorDataset(train_images, train_labels)
 train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
 
-
 valid_sampler = TensorDataset(test_images_list[k].to(device), test_labels_list[k].to(device))
-
-
-
-'''
-for i in range(5):
-    wished_idx = []
-    for idx, label in enumerate(valid_sampler.datasets[i]):
-        if label in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,15, 16, 17, 18, 19]:
-            wished_idx.append(idx)
-        #indices = [idx for idx, target in enumerate(valid_sampler.datasets[i]) if target in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,15, 16, 17, 18, 19]]
-    valid_sampler.datasets[i] = torch.utils.data.Subset(valid_sampler.datasets[i], wished_idx)
-print(valid_sampler.datasets[i])
-'''
-
 valid_dataloader = DataLoader(valid_sampler, batch_size=batch_size, shuffle=False, num_workers=0)
-print(len(valid_dataloader))
 
 fold_perf = np.array([0,0,0,0,0])
 all_preds = torch.tensor([])
-all_preds = all_preds.to(device)
 all_labels = torch.tensor([])
-all_labels = all_labels.to(device)
 for t in range(epochs): # itération sur les epochs
     print(f"Epoch {t+1}\n-------------------------------")
     epoch_train_perf = train_loop(train_dataloader, model, loss_fn, optimizer)
-    # fold_perf = np.vstack((fold_perf, np.insert(epoch_train_perf, 0, t)))
     valid_preds, valid_labels, epoch_valid_perf = valid_loop(valid_dataloader, model, loss_fn)
-    # fold_perf = np.vstack((fold_perf, np.insert(epoch_valid_perf, 0, t)))
     epoch_perf = np.concatenate((epoch_train_perf, epoch_valid_perf))
     fold_perf = np.vstack((fold_perf, np.insert(epoch_perf, 0, t)))
     all_preds = torch.cat((all_preds, valid_preds), dim=0)
     all_labels = torch.cat((all_labels, valid_labels), dim=0)
+    # fold_perf = np.vstack((fold_perf, np.insert(epoch_valid_perf, 0, t)))
+    # fold_perf = np.vstack((fold_perf, np.insert(epoch_train_perf, 0, t)))
 print("Done!")
 
 np.savetxt("./output/fold_perf"+str(k)+".csv", fold_perf, fmt='%1f', delimiter=';') #%1.5f
 
 torch.save(model.state_dict(), "./output/fold"+str(k)+".pt")
 
+organs = {
+            1247 : "Trachea",
+            1302 : "Right Lung",
+            1326 : "Left Lung",
+            170 : "Pancreas",
+            187 : "Gallbladder",
+            237 : "Urinary Bladder",
+            2473 : "Sternum",
+            29193 : "First Lumbar Vertebra",
+            29662 : "Right Kidney",
+            29663 : "Left Kidney",
+            30324 : "Right Adrenal Gland",
+            30325 : "Left Adrenal Gland",
+            32248 : "Right Psoas Major",
+            32249 : "Left Psoas Major",
+            40357 : "Right rectus abdominis",
+            40358 : "Left rectus abdominis",
+            480 : "Aorta",
+            58 : "Liver",
+            7578 : "Thyroid Gland",
+            86 : "Spleen",
+            0 : "Background",
+            1 : "Body Envelope",
+            2 : "Thorax-Abdomen"
+        }
+
+lo = sorted([organs[i] for i in organs])
+
+confusionMX = sklearn.metrics.confusion_matrix(all_labels, all_preds)
+plt.figure(figsize=(10,10))
+plt.imshow(confusionMX,cmap='rainbow_r')
+plt.title("Confusion Matrix for test Data of fold number "+str(i+1), fontsize=20)
+plt.xticks(np.arange(23),lo, rotation=90)
+plt.yticks(np.arange(23),lo)
+plt.ylabel('Actual Label', fontsize=15)
+plt.xlabel('Predicted Label', fontsize=15)
+plt.colorbar()
+width,height = confusionMX.shape
+for x in range(width):
+    for y in range(height):
+        plt.annotate(str(confusionMX[x][y]),xy=(y,x),horizontalalignment='center',verticalalignment='center')
+plt.savefig("CMX_fold_"+str(k)+".png", bbox_inches='tight', dpi=300)
+
+''' MATRICE DE CONFUSION FAIT MAISON
 stacked = torch.stack(
 (
     all_labels
@@ -293,13 +309,13 @@ for p in stacked:
     pl = int(pl)
     cmt[tl, pl] = cmt[tl, pl] + 1
 
-
 np.set_printoptions(suppress=False)
 cmt = cmt.numpy()
 
 np.savetxt("./output/fold"+str(k)+".csv", cmt, fmt='%1.1d', delimiter=';')
-
 '''
+
+''' MATRICE DE CONFUSION PYTORCH
 metric = ignite.metrics.confusion_matrix.ConfusionMatrix(num_classes=23)
 metric.attach(default_evaluator, 'cm')
 #y_pred_tensor = torch.FloatTensor(y_pred_all)
