@@ -5,14 +5,15 @@ import matplotlib.pyplot as plt
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 import sklearn
+from sklearn.metrics import confusion_matrix
 import sys
 
 k = int(sys.argv[1]) # fold number
 
 #> hyperparamètres
-learning_rate = 1e-4
-batch_size = 4
-epochs = 1
+learning_rate = 1e-3
+batch_size = 64
+epochs = 25
 
 # régularisation L1, par Szymon Maszke
 # https://stackoverflow.com/questions/42704283/adding-l1-l2-regularization-in-pytorch
@@ -176,13 +177,13 @@ def valid_loop(dataloader, model, loss_fn):
         for X, y in dataloader:
             pred = model(X)
             soft = nn.Softmax(dim=0)
-            all_preds = torch.cat((all_preds, soft(pred).argmax(1).detach()), dim=0)
-            all_labels = torch.cat((all_labels, y.detach()), dim=0)
+            all_preds = torch.cat((all_preds, soft(pred).argmax(1).detach().cpu()), dim=0)
+            all_labels = torch.cat((all_labels, y.detach().cpu()), dim=0)
 
             test_loss += loss_fn(pred, y.long()).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-            print("    VALID pred: ", pred)
-            print("    VALID y: ", y)
+            #print("    VALID pred: ", pred)
+            #print("    VALID y: ", y)
             #a = input("break")
             # print("pred: ", pred)
             # print("pred.argmax(1): ", pred.argmax(1))
@@ -212,7 +213,7 @@ print(f"Fold {k+1}\n-------------------------------\n---------------------------
 model = Net()
 model = Net().to(device)
 model.to(torch.float)
-model.apply(reset_weights)
+#model.apply(reset_weights)
 
 #> fonction de perte et algorythme d'optimisation
 loss_fn = nn.CrossEntropyLoss()
@@ -222,7 +223,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,  weight_decay
 #train_sampler = torch.utils.data.ConcatDataset(( train_groups[(k+1)%4], train_groups[(k+2)%4], train_groups[(k+3)%4] ))
 train_images = torch.cat( ( train_images_list[(k+1)%4],  train_images_list[(k+2)%4], train_images_list[(k+3)%4]), dim=0 ).to(device)
 train_labels = torch.cat( ( train_labels_list[(k+1)%4],  train_labels_list[(k+2)%4], train_labels_list[(k+3)%4]) ).to(device) 
-print(torch.unique(train_labels))
+#print(torch.unique(train_labels))
 #a = input("break")
 train_sampler = TensorDataset(train_images, train_labels)
 train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
@@ -249,40 +250,40 @@ np.savetxt("./output/fold_perf"+str(k)+".csv", fold_perf, fmt='%1f', delimiter='
 
 torch.save(model.state_dict(), "./output/fold"+str(k)+".pt")
 
-organs = {
-            1247 : "Trachea",
-            1302 : "Right Lung",
-            1326 : "Left Lung",
-            170 : "Pancreas",
-            187 : "Gallbladder",
-            237 : "Urinary Bladder",
-            2473 : "Sternum",
-            29193 : "First Lumbar Vertebra",
-            29662 : "Right Kidney",
-            29663 : "Left Kidney",
-            30324 : "Right Adrenal Gland",
-            30325 : "Left Adrenal Gland",
-            32248 : "Right Psoas Major",
-            32249 : "Left Psoas Major",
-            40357 : "Right rectus abdominis",
-            40358 : "Left rectus abdominis",
-            480 : "Aorta",
-            58 : "Liver",
-            7578 : "Thyroid Gland",
-            86 : "Spleen",
-            0 : "Background",
-            1 : "Body Envelope",
-            2 : "Thorax-Abdomen"
-        }
+organs = [
+            "Trachea",
+            "Right Lung",
+            "Left Lung",
+            "Pancreas",
+            "Gallbladder",
+            "Urinary Bladder",
+            "Sternum",
+            "First Lumbar Vertebra",
+            "Right Kidney",
+            "Left Kidney",
+            "Right Adrenal Gland",
+            "Left Adrenal Gland",
+            "Right Psoas Major",
+            "Left Psoas Major",
+            "Right rectus abdominis",
+            "Left rectus abdominis",
+            "Aorta",
+            "Liver",
+            "Thyroid Gland",
+            "Spleen",
+            "Background",
+            "Body Envelope",
+            "Thorax-Abdomen"
+        ]
 
-lo = sorted([organs[i] for i in organs])
-
-confusionMX = sklearn.metrics.confusion_matrix(all_labels, all_preds)
+print(torch.unique(all_labels))
+confusionMX = confusion_matrix(all_labels, all_preds, normalize='pred')
+confusionMX = np.round_(confusionMX, decimals=0)
 plt.figure(figsize=(10,10))
 plt.imshow(confusionMX,cmap='rainbow_r')
 plt.title("Confusion Matrix for test Data of fold number "+str(i+1), fontsize=20)
-plt.xticks(np.arange(23),lo, rotation=90)
-plt.yticks(np.arange(23),lo)
+plt.xticks(np.arange(23),organs, rotation=90)
+plt.yticks(np.arange(20),organs[:-3])
 plt.ylabel('Actual Label', fontsize=15)
 plt.xlabel('Predicted Label', fontsize=15)
 plt.colorbar()
