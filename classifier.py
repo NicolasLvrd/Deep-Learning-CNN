@@ -164,8 +164,13 @@ def train_loop(dataloader, model, loss_fn, optimizer):
 
 #> boucle de validation
 def valid_loop(dataloader, model, loss_fn):
-    #y_pred = []
-    #y_true = []
+    #dataiter = iter(dataloader)
+    #images, labels = dataiter.next()
+    #img = images[0][0]
+    #img = img.cpu()
+    #npimg = img.numpy()
+    #plt.imshow(npimg)
+    #plt.show()
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     test_loss, correct = 0, 0
