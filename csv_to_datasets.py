@@ -29,6 +29,7 @@ test_images_list = [[] for i in range(4)]
 cpt = 0
 for file in os.listdir(directory):
     filename = os.fsdecode(file)
+    print(filename)
     if filename.endswith(".csv"):
         print("Reading ", filename)
         del_idx = []

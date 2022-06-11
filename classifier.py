@@ -6,6 +6,7 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 import sklearn
 import sys
+from datasets import TrainDataset
 
 k = int(sys.argv[1]) # fold number
 
@@ -47,37 +48,6 @@ class L1(torch.nn.Module):
 # utilisation du GPU si disponible
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using {device} device")
-
-'''
-train_groups = [] # datasets regroupés par groupe de 5 patients pour le 4-folds
-test_groups = []
-
-patients = [] # datasets de chaque patient
-for i in range(20):
-    patients.append( torch.load("./data/train_patient"+str(i), map_location=torch.device('cpu')) )
-
-
-for i in range(4):
-    train_groups.append((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4])) #torch.utils.data.ConcatDataset(
-
-patients = [] # datasets de chaque patient
-for i in range(20):
-    patients.append( torch.load("./data/test_patient"+str(i), map_location=torch.device('cpu')) )
-
-for i in range(4):
-    test_groups.append((patients[5*i], patients[5*i+1], patients[5*i+2], patients[5*i+3], patients[5*i+4]))
-'''
-
-train_labels_list = [None]*4
-test_labels_list = [None]*4
-train_images_list = [None]*4
-test_images_list = [None]*4
-
-for i in range(4):
-    train_labels_list[i] = torch.load("./data/train/labels/group"+str(i), map_location=torch.device('cpu'))
-    train_images_list[i] = torch.load("./data/train/images/group"+str(i), map_location=torch.device('cpu'))
-    test_labels_list[i] = torch.load("./data/test/labels/group"+str(i), map_location=torch.device('cpu'))
-    test_images_list[i] = torch.load("./data/test/images/group"+str(i), map_location=torch.device('cpu'))
 
 #> définition du réseau
 class Net(nn.Module):
@@ -201,39 +171,23 @@ def valid_loop(dataloader, model, loss_fn):
     print("")
     return all_preds, all_labels, np.array([test_loss, correct])
 
-def reset_weights(m):
-  '''
-    Try resetting model weights to avoid
-    weight leakage.
-  '''
-  for layer in m.children():
-   if hasattr(layer, 'reset_parameters'):
-    print(f'Reset trainable parameters of layer = {layer}')
-    layer.reset_parameters()
-
 #> execution de l'apprentissage et des tests
 
 print(f"Fold {k+1}\n-------------------------------\n-------------------------------")
 model = Net()
 model = Net().to(device)
 model.to(torch.float)
-model.apply(reset_weights)
 
 #> fonction de perte et algorythme d'optimisation
 loss_fn = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,  weight_decay=0) #, betas=(0.90, 0.999), weight_decay=0.0099
 # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #weight_decay=1e-5
 
-#train_sampler = torch.utils.data.ConcatDataset(( train_groups[(k+1)%4], train_groups[(k+2)%4], train_groups[(k+3)%4] ))
-train_images = torch.cat( ( train_images_list[(k+1)%4],  train_images_list[(k+2)%4], train_images_list[(k+3)%4]), dim=0 ).to(device)
-train_labels = torch.cat( ( train_labels_list[(k+1)%4],  train_labels_list[(k+2)%4], train_labels_list[(k+3)%4]) ).to(device) 
-print(torch.unique(train_labels))
-#a = input("break")
-train_sampler = TensorDataset(train_images, train_labels)
-train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
+train_dataset = torch.load("data/train/train_fold_" + str(k) + ".pt")
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
-valid_sampler = TensorDataset(test_images_list[k].to(device), test_labels_list[k].to(device))
-valid_dataloader = DataLoader(valid_sampler, batch_size=batch_size, shuffle=False, num_workers=0)
+tes_dataset = torch.load("data/test/test_fold_" + str(k) + ".pt")
+test_dataloader = DataLoader(tes_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
 fold_perf = np.array([0,0,0,0,0])
 all_preds = torch.tensor([])
@@ -241,7 +195,7 @@ all_labels = torch.tensor([])
 for t in range(epochs): # itération sur les epochs
     print(f"Epoch {t+1}\n-------------------------------")
     epoch_train_perf = train_loop(train_dataloader, model, loss_fn, optimizer)
-    valid_preds, valid_labels, epoch_valid_perf = valid_loop(valid_dataloader, model, loss_fn)
+    valid_preds, valid_labels, epoch_valid_perf = valid_loop(test_dataloader, model, loss_fn)
     epoch_perf = np.concatenate((epoch_train_perf, epoch_valid_perf))
     fold_perf = np.vstack((fold_perf, np.insert(epoch_perf, 0, t)))
     all_preds = torch.cat((all_preds, valid_preds), dim=0)
