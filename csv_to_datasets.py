@@ -10,7 +10,7 @@ train_transform = torchvision.transforms.Compose([
     torchvision.transforms.Normalize(127.5, 127.5), # mapping des niveaux de gris dans [-1, 1]
     # torchvision.transforms.RandomHorizontalFlip(),
     torchvision.transforms.RandomRotation(5),
-    torchvision.transforms.RandomCrop(17)
+    #torchvision.transforms.RandomResizedCrop(33)
 ])
 
 test_transform = torchvision.transforms.Normalize(127.5, 127.5)

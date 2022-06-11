@@ -128,13 +128,13 @@ class Net(nn.Module):
 
 #> boucle d'apprentissage
 def train_loop(dataloader, model, loss_fn, optimizer):
-    #dataiter = iter(dataloader)
-    #images, labels = dataiter.next()
-    #img = images[0][0]
-    #img = img.cpu()
-    #npimg = img.numpy()
-    #plt.imshow(npimg)
-    #plt.show()
+    dataiter = iter(dataloader)
+    images, labels = dataiter.next()
+    img = images[0][0]
+    img = img.cpu()
+    npimg = img.numpy()
+    plt.imshow(npimg)
+    plt.show()
 
     size = len(dataloader.dataset)
     correct, train_loss = 0, 0
@@ -164,14 +164,15 @@ def train_loop(dataloader, model, loss_fn, optimizer):
 
 #> boucle de validation
 def valid_loop(dataloader, model, loss_fn):
-    #dataiter = iter(dataloader)
-    #images, labels = dataiter.next()
-    #img = images[0][0]
-    #img = img.cpu()
-    #npimg = img.numpy()
-    #plt.imshow(npimg)
-    #plt.show()
+    dataiter = iter(dataloader)
+    images, labels = dataiter.next()
+    img = images[0][0]
+    img = img.cpu()
+    npimg = img.numpy()
+    plt.imshow(npimg)
+    plt.show()
     size = len(dataloader.dataset)
+
     num_batches = len(dataloader)
     test_loss, correct = 0, 0
 
@@ -231,7 +232,7 @@ train_labels = torch.cat( ( train_labels_list[(k+1)%4],  train_labels_list[(k+2)
 #print(torch.unique(train_labels))
 #a = input("break")
 train_sampler = TensorDataset(train_images, train_labels)
-train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=True, num_workers=0)
+train_dataloader = DataLoader(train_sampler, batch_size=batch_size, shuffle=False, num_workers=0)
 
 valid_sampler = TensorDataset(test_images_list[k].to(device), test_labels_list[k].to(device))
 valid_dataloader = DataLoader(valid_sampler, batch_size=batch_size, shuffle=False, num_workers=0)
