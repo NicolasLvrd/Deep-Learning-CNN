@@ -13,7 +13,7 @@ k = int(sys.argv[1]) # fold number
 
 #> hyperparamètres
 learning_rate = 1e-3
-batch_size = 64
+batch_size = 128
 epochs = 150
 
 # régularisation L1, par Szymon Maszke
@@ -60,7 +60,7 @@ class Net(nn.Module):
         self.conv2 = nn.Conv2d(6, 16, 5) # 20 x (7-6+1) x 2
         self.fc1 = nn.Linear(400, 150)
         self.fc2 = nn.Linear(150, 46)
-        self.fc3 = nn.Linear(46, 23)
+        self.fc3 = nn.Linear(150, 23)
         self.dropout = nn.Dropout(0.25)
         '''
         
@@ -91,7 +91,7 @@ class Net(nn.Module):
         x = F.max_pool2d(F.relu(self.conv2(x)), 2)
         x = torch.flatten(x, 1) # flatten all dimensions except batch
         x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        # x = F.relu(self.fc2(x))
         x = self.fc3(x)
         #print("forward: ", x.shape)
         return x
@@ -105,16 +105,19 @@ def train_loop(dataloader, model, loss_fn, optimizer):
     #npimg = img.numpy()
     #plt.imshow(npimg)
     #plt.show()
-
+    print("ENTER TRAIN LOOP")
     size = len(dataloader.dataset)
     correct, train_loss = 0, 0
     for batch, (X, y) in enumerate(dataloader):
+        #print(f"Batch {batch}, X shape {X.shape}")
+        '''
         if batch == 190:    
             img = X[0][0]
             img = img.cpu()
             npimg = img.numpy()
             plt.imshow(npimg)
             plt.show()
+        '''
         # Compute prediction and loss
         pred = model(X)
         #print("    train X: ", X.shape)
@@ -192,11 +195,16 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,  weight_decay
 # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate) #weight_decay=1e-5
 
 train_dataset = torch.load("data/train/train_fold" + str(k) + ".pt", map_location=torch.device(device))
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 print("TRAIN dataloader size: ", len(train_dataloader))
+dataiter = iter(train_dataloader)
+images, labels = dataiter.next()
+img = images[0][0]
+print(img.shape)
+
 
 test_dataset = torch.load("data/test/test_fold" + str(k) + ".pt", map_location=torch.device(device))
-test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 print("TEST dataloader size: ", len(test_dataloader))
 
 fold_perf = np.array([0,0,0,0,0])
