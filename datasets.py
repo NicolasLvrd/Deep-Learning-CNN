@@ -4,12 +4,27 @@ import numpy as np
 import torch
 import torchvision
 
+
 test_folds = {
     0: [15, 16, 17, 18, 19],
     1: [10, 11, 12, 13, 14],
     2: [5, 6, 7, 8, 9],
     3: [0, 1, 2, 3, 4]
 }
+organs_code = {1247:0 , 1302:1 , 1326:2 , 170:3 , 187:4 , 237:5 , 2473:6 , 29193:7 , 29662:8 , 29663:9 , 30324:10 , 30325:11 , 32248:12 , 32249:13 , 40357:14 , 40358:15, 480:16 , 58:17 , 7578:18, 86:19 , 0:20 , 1:21 , 2:22}
+
+path = "data\CTce_ThAb_b33x33_n1000_8bit"
+directory = os.fsencode(path)
+
+train_transform = torchvision.transforms.Compose([
+    torchvision.transforms.Normalize(127.5, 127.5) # mapping des niveaux de gris dans [-1, 1]
+    # torchvision.transforms.RandomHorizontalFlip(),
+    # torchvision.transforms.RandomRotation((0, 5)),
+    # torchvision.transforms.RandomCrop(17)
+    # torchvision.transforms.RandomResizedCrop(33)
+])
+
+test_transform = torchvision.transforms.Normalize(127.5, 127.5)
 
 class TrainDataset(Dataset):
     def __init__(self, fold):
@@ -49,21 +64,6 @@ class TestDataset(Dataset):
         image = self.images_tensor[idx]
         image = test_transform(image)
         return (image, label)
-
-organs_code = {1247:0 , 1302:1 , 1326:2 , 170:3 , 187:4 , 237:5 , 2473:6 , 29193:7 , 29662:8 , 29663:9 , 30324:10 , 30325:11 , 32248:12 , 32249:13 , 40357:14 , 40358:15, 480:16 , 58:17 , 7578:18, 86:19 , 0:20 , 1:21 , 2:22}
-
-path = "data\CTce_ThAb_b33x33_n1000_8bit"
-directory = os.fsencode(path)
-
-train_transform = torchvision.transforms.Compose([
-    torchvision.transforms.Normalize(127.5, 127.5), # mapping des niveaux de gris dans [-1, 1]
-    # torchvision.transforms.RandomHorizontalFlip(),
-    # torchvision.transforms.RandomRotation((0, 5)),
-    # torchvision.transforms.RandomCrop(17)
-    # torchvision.transforms.RandomResizedCrop(33)
-])
-
-test_transform = torchvision.transforms.Normalize(127.5, 127.5)
 
 if __name__ == '__main__':
     train_labels_list = []
