@@ -14,7 +14,7 @@ k = int(sys.argv[1]) # fold number
 #> hyperparamètres
 learning_rate = 1e-3
 batch_size = 128
-epochs = 150
+epochs = 75
 
 # régularisation L1, par Szymon Maszke
 # https://stackoverflow.com/questions/42704283/adding-l1-l2-regularization-in-pytorch
