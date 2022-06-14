@@ -13,6 +13,7 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, ConfusionMatrixDisplay
 from time import perf_counter
 import joblib
+from PIRpca import apply_pca
 # training the algorithm
 
 # C = 10  # SVM regularization parameter
