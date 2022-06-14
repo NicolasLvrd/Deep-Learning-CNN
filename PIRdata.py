@@ -13,6 +13,8 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, ConfusionMatrixDisplay
 from time import perf_counter
 import joblib
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.ensemble import BaggingClassifier
 # training the algorithm
 
 # C = 10  # SVM regularization parameter
@@ -64,7 +66,9 @@ AllData = np.concatenate(array[:Nbrfile])
 AllData = AllData.astype('float16')
 
 # C = 0.001  # SVM regularization parameter
-svmclassifier = SVC(kernel="rbf", C=1)
+# svmclassifier = SVC(kernel="rbf", C=1)
+n_estimators = 10
+svmclassifier = OneVsRestClassifier(BaggingClassifier(SVC(kernel='rbf', C=1, probability=False, class_weight='balanced'), max_samples=1.0 / n_estimators, n_estimators=n_estimators))
 # totalTrainingAccuracy = 0
 # svmclassifier = LinearSVC(
 # C=0.0001, dual=False, class_weight='balanced', max_iter=1500)
@@ -87,11 +91,14 @@ for i in range(NbrPlis):
 
     # pca
     nbr_pca_features = 10  # nombre de composantes principales
-    pca = PCA(n_components=nbr_pca_features)
-    pca.fit(X_train, y_train)
+    #pca = PCA(n_components=nbr_pca_features)
+    #pca.fit(X_train, y_train)
+
     #print("X_train avant pca    ", X_train.dtype)
     # print(X_train.shape)
-    X_train = pca.transform(X_train)
+
+    #X_train = pca.transform(X_train)
+
     #print("X_train apres pca sans transformation  ", X_train.dtype)
     X_train = X_train.astype('float16')
     #print("X_train apres pca avec transformation  ", X_train.dtype)
@@ -114,11 +121,11 @@ for i in range(NbrPlis):
     totalTrainingAccuracy += accuracy_score(y_pred_train, y_train)
 
     joblib.dump(
-        pca, 'C:\Claire F\INSA LYON\COURS\S2\PIRE\PIR\PCA\pcaPliN'+str(i+1)+'.pkl')
+        pca, 'pcaPliN'+str(i+1)+'.pkl')
     print("le pca a bien été sauvegardé")
 
     joblib.dump(
-        svmclassifier, 'C:\Claire F\INSA LYON\COURS\S2\PIRE\PIR\SVM\svmPliN'+str(i+1)+'.pkl')
+        svmclassifier, 'svmPliN'+str(i+1)+'.pkl')
     print("le classifieur a bien été sauvegardé")
 
     # vider les array
@@ -230,7 +237,7 @@ for x in range(width):
         plt.annotate(str(matConfCumulee[x][y]), xy=(
             y, x), horizontalalignment='center', verticalalignment='center')
 
-plt.savefig("C:\Claire F\INSA LYON\COURS\S2\PIRE\PIR\matrices\MatConf.png")
+plt.savefig("MatConf.png")
 matConfCumulee = matConfCumulee[3:, 3:]
 
 t0_stop = perf_counter()
