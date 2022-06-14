@@ -52,12 +52,13 @@ totalTestingAccuracy = 0
 
 t0_start = perf_counter()
 
+'''
 for i in range(Nbrfile):  # pour chaque fichier
     with open(path + dirs[i]) as file_name:  # ouvre le fichier
         # array conytenant les data du fichier csv i qui s'ajoute pour chaque fichiers
         array.append(np.loadtxt(file_name, delimiter=","))
     print(str(i+1)+" fichiers extraits")
-
+'''
 #array = array.astype('float16')
 # print(array)
 AllData = np.concatenate(array[:Nbrfile])
@@ -74,6 +75,7 @@ for i in range(NbrPlis):
     TrainingDatas = []  # stock the training datas for each folder
     TestingDatas = []  # stock the testing datas for each folder
 
+    '''
     train = np.concatenate(
         array[0:nbFichiersTestParPlis*i]+array[nbFichiersTestParPlis*(i+1):Nbrfile])
     train = train.astype('float16')
@@ -98,7 +100,9 @@ for i in range(NbrPlis):
     #print("X_train apres pca avec transformation  ", X_train.dtype)
     print("")
     print("la pca sur X_train a bien été éffectuée")
-
+    '''
+    X_train = np.load("X_train.npy")
+    y_train = np.load("y_train.npy")
     t1_start = perf_counter()
     svmclassifier.fit(X_train, y_train)
     t1_stop = perf_counter()
