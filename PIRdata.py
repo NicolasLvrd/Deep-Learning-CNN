@@ -15,6 +15,7 @@ from time import perf_counter
 import joblib
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.ensemble import BaggingClassifier
+from PIRpca import apply_pca
 # training the algorithm
 
 # C = 10  # SVM regularization parameter
@@ -90,7 +91,7 @@ for i in range(NbrPlis):
     print("DATA de Train pour le pli", i+1, " : OK")
 
     # pca
-    nbr_pca_features = 10  # nombre de composantes principales
+    #nbr_pca_features = 10  # nombre de composantes principales
     #pca = PCA(n_components=nbr_pca_features)
     #pca.fit(X_train, y_train)
 
@@ -100,7 +101,7 @@ for i in range(NbrPlis):
     #X_train = pca.transform(X_train)
 
     #print("X_train apres pca sans transformation  ", X_train.dtype)
-    X_train = X_train.astype('float16')
+    X_train = apply_pca(X_train, y_train)
     #print("X_train apres pca avec transformation  ", X_train.dtype)
     print("")
     print("la pca sur X_train a bien été éffectuée")
