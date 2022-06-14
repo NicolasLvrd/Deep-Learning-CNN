@@ -12,7 +12,7 @@ from datasets import TrainDataset, TestDataset
 k = int(sys.argv[1]) # fold number
 
 #> hyperparamètres
-learning_rate = 1e-3
+learning_rate = 1e-4
 batch_size = 128
 epochs = 75
 
@@ -98,13 +98,15 @@ class Net(nn.Module):
 
 #> boucle d'apprentissage
 def train_loop(dataloader, model, loss_fn, optimizer):
-    #dataiter = iter(dataloader)
-    #images, labels = dataiter[15000]
-    #img = images[0][0]
-    #img = img.cpu()
-    #npimg = img.numpy()
-    #plt.imshow(npimg)
-    #plt.show()
+    dataiter = iter(dataloader)
+    dataiter.next()
+    images, labels = dataiter.next()
+    img = images[0][0]
+    img = img.cpu()
+    npimg = img.numpy()
+    plt.imshow(npimg, cmap='gray')
+    print(labels[0])
+    plt.show()
     print("ENTER TRAIN LOOP")
     size = len(dataloader.dataset)
     correct, train_loss = 0, 0

@@ -21,7 +21,7 @@ train_transform = torchvision.transforms.Compose([
     # torchvision.transforms.RandomHorizontalFlip(),
     # torchvision.transforms.RandomRotation((0, 5)),
     # torchvision.transforms.RandomCrop(17)
-    torchvision.transforms.RandomResizedCrop(33)
+    torchvision.transforms.RandomResizedCrop(33, scale=(0.08, 1.0), ratio=(0.99, 1))
 ])
 
 test_transform = torchvision.transforms.Normalize(127.5, 127.5)
