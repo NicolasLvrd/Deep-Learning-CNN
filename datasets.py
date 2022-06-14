@@ -17,11 +17,11 @@ path = "data\CTce_ThAb_b33x33_n1000_8bit"
 directory = os.fsencode(path)
 
 train_transform = torchvision.transforms.Compose([
-    torchvision.transforms.Normalize(127.5, 127.5) # mapping des niveaux de gris dans [-1, 1]
+    torchvision.transforms.Normalize(127.5, 127.5), # mapping des niveaux de gris dans [-1, 1]
     # torchvision.transforms.RandomHorizontalFlip(),
     # torchvision.transforms.RandomRotation((0, 5)),
     # torchvision.transforms.RandomCrop(17)
-    # torchvision.transforms.RandomResizedCrop(33)
+    torchvision.transforms.RandomResizedCrop(33)
 ])
 
 test_transform = torchvision.transforms.Normalize(127.5, 127.5)
