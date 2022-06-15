@@ -15,7 +15,6 @@ from time import perf_counter
 import joblib
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.ensemble import BaggingClassifier
-from PIRpca import apply_pca
 # training the algorithm
 
 # C = 10  # SVM regularization parameter
@@ -63,21 +62,29 @@ for i in range(Nbrfile):  # pour chaque fichier
 '''
 #array = array.astype('float16')
 # print(array)
-AllData = np.concatenate(array[:Nbrfile])
+#AllData = np.concatenate(array[:Nbrfile])
 #AllData = np.round(AllData)
-AllData = AllData.astype('float16')
+#AllData = AllData.astype('float16')
 
 # C = 0.001  # SVM regularization parameter
-# svmclassifier = SVC(kernel="rbf", C=1)
+svmclassifier = SVC(kernel="rbf", C=1000)
+'''
 n_estimators = 10
 svmclassifier = OneVsRestClassifier(BaggingClassifier(SVC(kernel='rbf', C=1, probability=False, class_weight='balanced'), max_samples=1.0 / n_estimators, n_estimators=n_estimators))
+'''
 # totalTrainingAccuracy = 0
 # svmclassifier = LinearSVC(
 # C=0.0001, dual=False, class_weight='balanced', max_iter=1500)
-
+total_avg_accuracy = np.array([0,0,0]) # [fold number ; train acc ; test acc]
+total_avg_recall = np.array([0,0,0]) # [fold number ; train rec ; test rec]
 for i in range(NbrPlis):
+    print("FOLD ", i)
     TrainingDatas = []  # stock the training datas for each folder
     TestingDatas = []  # stock the testing datas for each folder
+
+    fold_avg_accuracy = np.array([0,0])
+    fold_avg_recall = np.array([0,0])
+    fold_organs_accuracy = np.array([0,0])
 
     '''
     train = np.concatenate(
@@ -108,9 +115,12 @@ for i in range(NbrPlis):
     print("")
     print("la pca sur X_train a bien été éffectuée")
     '''
-    X_train = np.load("X_train.npy")
-    y_train = np.load("y_train.npy")
+    X_train = np.load("X_train_fold"+str(i)+".npy")
+    y_train = np.load("y_train_fold"+str(i)+".npy")
+    print("X_train shape:", X_train.shape)
+    print("y_train shape:", y_train.shape)
     t1_start = perf_counter()
+    print("Starting fit")
     svmclassifier.fit(X_train, y_train)
     t1_stop = perf_counter()
     print("")
@@ -124,10 +134,9 @@ for i in range(NbrPlis):
         f"The model is {accuracy_score(y_pred_train,y_train)*100}% accurate sur la base de train pour le pli n° {i+1}")
 
     totalTrainingAccuracy += accuracy_score(y_pred_train, y_train)
+    fold_avg_accuracy[0] = totalTrainingAccuracy
+    
 
-    joblib.dump(
-        pca, 'pcaPliN'+str(i+1)+'.pkl')
-    print("le pca a bien été sauvegardé")
 
     joblib.dump(
         svmclassifier, 'svmPliN'+str(i+1)+'.pkl')
@@ -139,6 +148,7 @@ for i in range(NbrPlis):
     y_train = []
     y_pred_train = []
 
+    '''
     test = np.concatenate(
         array[nbFichiersTestParPlis*i:nbFichiersTestParPlis*(i+1)])
     test = test.astype('float16')
@@ -151,15 +161,19 @@ for i in range(NbrPlis):
 
     # print("")
     #print("DATA de Test pour le pli", i+1, " : OK")
-
+    '''
+    X_test = np.load("X_test_fold"+str(i)+".npy")
+    y_test = np.load("y_test_fold"+str(i)+".npy")
     # predicting classes
-    y_pred_test = svmclassifier.predict(pca.transform(X_test))
+    y_pred_test = svmclassifier.predict(X_test)
 
     # print("")
     # print(
     # f"The model is {accuracy_score(y_pred_test,y_test)*100}% accurate sur base de test pour le pli n° {i+1}")
 
     totalTestingAccuracy += accuracy_score(y_pred_test, y_test)
+    fold_avg_accuracy[1] = totalTestingAccuracy
+    print("Testing Accuracy:", totalTestingAccuracy)
 
     ConfMatr = confusion_matrix(y_pred_test, y_test)
 

@@ -4,3 +4,5 @@ classifier_blitz.py
 classifier_suffle.py
 sandbox.py
 __pycache__
+data_SVM
+output_SVM
