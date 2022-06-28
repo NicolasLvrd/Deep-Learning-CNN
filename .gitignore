@@ -1,8 +1,10 @@
+__pycache__
 data
 output
 classifier_blitz.py
 classifier_suffle.py
+csv_to_datasets.py
+PIR_save_dataset.py
+PIRdata.py
+save_datasets.py
 sandbox.py
-__pycache__
-data_SVM
-output_SVM

@@ -1,6 +1,3 @@
-# import all the librairies
-#!/usr/bin/python
-
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,28 +12,9 @@ from time import perf_counter
 import joblib
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.ensemble import BaggingClassifier
-# training the algorithm
-
-# C = 10  # SVM regularization parameter
-# gamma = 0.0001
-# svclassifier = SVC(kernel="rbf", C=C, gamma= gamma)
-# svclassifier = LinearSVC(random_state=0)
-# svclassifier = LinearSVC(random_state=0)
-# svclassifier = LinearSVC(C=0.0005, random_state=13)
-# svclassifier = SVC(kernel="linear", max_iter = 3)
-# svclassifier = LinearSVC(C=0.0005,dual=False)
-# svmclassifier = LinearSVC(C=1, dual=False, class_weight='balanced')
-
-# dual = False prefered when nbr samples > nbr features
-# C = regularization parameter to avoid overfitting
-# random_state has no effect on the results if dual = False
-# max_iter = maximum number of iterations to perform
-
-# import the dataseet + concatener data set
 
 # Open a file
 path = "data\CTce_ThAb_b33x33_n1000_8bit\\"
-
 
 # met les noms de fichier contenu dans ce dossier (path) dans un tableau dirs
 dirs = os.listdir(path)
@@ -53,28 +31,12 @@ totalTestingAccuracy = 0
 
 t0_start = perf_counter()
 
-'''
-for i in range(Nbrfile):  # pour chaque fichier
-    with open(path + dirs[i]) as file_name:  # ouvre le fichier
-        # array conytenant les data du fichier csv i qui s'ajoute pour chaque fichiers
-        array.append(np.loadtxt(file_name, delimiter=","))
-    print(str(i+1)+" fichiers extraits")
-'''
-#array = array.astype('float16')
-# print(array)
-#AllData = np.concatenate(array[:Nbrfile])
-#AllData = np.round(AllData)
-#AllData = AllData.astype('float16')
-
-# C = 0.001  # SVM regularization parameter
 svmclassifier = SVC(kernel="rbf", C=1000)
 '''
 n_estimators = 10
 svmclassifier = OneVsRestClassifier(BaggingClassifier(SVC(kernel='rbf', C=1, probability=False, class_weight='balanced'), max_samples=1.0 / n_estimators, n_estimators=n_estimators))
 '''
-# totalTrainingAccuracy = 0
-# svmclassifier = LinearSVC(
-# C=0.0001, dual=False, class_weight='balanced', max_iter=1500)
+
 total_avg_accuracy = np.array([0,0,0]) # [fold number ; train acc ; test acc]
 total_avg_recall = np.array([0,0,0]) # [fold number ; train rec ; test rec]
 for i in range(NbrPlis):
@@ -86,46 +48,16 @@ for i in range(NbrPlis):
     fold_avg_recall = np.array([0,0])
     fold_organs_accuracy = np.array([0,0])
 
-    '''
-    train = np.concatenate(
-        array[0:nbFichiersTestParPlis*i]+array[nbFichiersTestParPlis*(i+1):Nbrfile])
-    train = train.astype('float16')
-    # [x_train,y_train]
-
-    #TrainingDatas.append([train[:, 1:], np.ravel(train[:, :1])])
-
-    X_train = train[:, 1:]
-    y_train = np.ravel(train[:, :1])
-    print("")
-    print("DATA de Train pour le pli", i+1, " : OK")
-
-    # pca
-    #nbr_pca_features = 10  # nombre de composantes principales
-    #pca = PCA(n_components=nbr_pca_features)
-    #pca.fit(X_train, y_train)
-
-    #print("X_train avant pca    ", X_train.dtype)
-    # print(X_train.shape)
-
-    #X_train = pca.transform(X_train)
-
-    #print("X_train apres pca sans transformation  ", X_train.dtype)
-    X_train = apply_pca(X_train, y_train)
-    #print("X_train apres pca avec transformation  ", X_train.dtype)
-    print("")
-    print("la pca sur X_train a bien été éffectuée")
-    '''
+    # -------------------- TRAINING -------------------- #
     X_train = np.load("X_train_fold"+str(i)+".npy")
     y_train = np.load("y_train_fold"+str(i)+".npy")
     print("X_train shape:", X_train.shape)
     print("y_train shape:", y_train.shape)
     t1_start = perf_counter()
-    print("Starting fit")
     svmclassifier.fit(X_train, y_train)
     t1_stop = perf_counter()
     print("")
-    print("Elapsed time during the training process for the plis n°",
-          i+1, "in seconds:", t1_stop-t1_start)
+    print("Elapsed time during the training process for the plis n°", i+1, "in seconds:", t1_stop-t1_start)
 
     y_pred_train = svmclassifier.predict(X_train)
 
@@ -134,12 +66,10 @@ for i in range(NbrPlis):
         f"The model is {accuracy_score(y_pred_train,y_train)*100}% accurate sur la base de train pour le pli n° {i+1}")
 
     totalTrainingAccuracy += accuracy_score(y_pred_train, y_train)
-    fold_avg_accuracy[0] = totalTrainingAccuracy
+    foldTrainingAccuracy = accuracy_score(y_pred_train, y_train)
+    fold_avg_accuracy[0] = foldTrainingAccuracy
     
-
-
-    joblib.dump(
-        svmclassifier, 'svmPliN'+str(i+1)+'.pkl')
+    joblib.dump(svmclassifier, 'svmPliN'+str(i+1)+'.pkl')
     print("le classifieur a bien été sauvegardé")
 
     # vider les array
@@ -148,20 +78,7 @@ for i in range(NbrPlis):
     y_train = []
     y_pred_train = []
 
-    '''
-    test = np.concatenate(
-        array[nbFichiersTestParPlis*i:nbFichiersTestParPlis*(i+1)])
-    test = test.astype('float16')
-    # [x_test,y_test]
-    #TestingDatas.append([test[:, 1:], np.ravel(test[:, :1])])
-
-    X_test = test[:, 1:]
-
-    y_test = np.ravel(test[:, :1])
-
-    # print("")
-    #print("DATA de Test pour le pli", i+1, " : OK")
-    '''
+    # -------------------- TESTING -------------------- #
     X_test = np.load("X_test_fold"+str(i)+".npy")
     y_test = np.load("y_test_fold"+str(i)+".npy")
     # predicting classes
@@ -172,9 +89,15 @@ for i in range(NbrPlis):
     # f"The model is {accuracy_score(y_pred_test,y_test)*100}% accurate sur base de test pour le pli n° {i+1}")
 
     totalTestingAccuracy += accuracy_score(y_pred_test, y_test)
-    fold_avg_accuracy[1] = totalTestingAccuracy
+    foldTestingAccuracy = accuracy_score(y_pred_test, y_test)
+    fold_avg_accuracy[1] = foldTestingAccuracy
     print("Testing Accuracy:", totalTestingAccuracy)
 
+    # -------------------- SAVE FOLD ACCURACY -------------------- #
+    total_avg_accuracy = np.vstack((total_avg_accuracy, np.insert(fold_avg_accuracy, 0, i)))
+    np.savetxt("./output_SVM/fold_accuracy"+str(i)+".csv", total_avg_accuracy, fmt='%1f', delimiter=';')
+
+    # -------------------- PLOT CONFUSION MATRIX -------------------- #
     ConfMatr = confusion_matrix(y_pred_test, y_test)
 
     (l, a) = ConfMatr.shape
@@ -199,9 +122,11 @@ for i in range(NbrPlis):
     test = []
     ConfMatr = []
 
+np.savetxt("./output_SVM/organs_accuracy"+str(i)+".csv", précisionParOrganes, fmt='%1f', delimiter=';')
+
 totalTrainingAccuracy = (totalTrainingAccuracy/NbrPlis)*100
 totalTestingAccuracy = (totalTestingAccuracy/NbrPlis)*100
-print("")
+print("Tous les folds terminés \n")
 print("la moyenne de l'accuracy sur la base de train est de : ", totalTrainingAccuracy)
 print("la moyenne de l'accuracy sur la base de test est de : ", totalTestingAccuracy)
 
